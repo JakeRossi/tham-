@@ -4,7 +4,7 @@
   "category": "differential-equations",
   "description": "ODE / PDE drill.",
   "difficulty_notes": "0.0 = separable first-order ODEs, 1.0 = basic PDEs",
-  "implemented": false,
+  "implemented": true,
   "prerequisites": [
     "derivatives",
     "integrals"

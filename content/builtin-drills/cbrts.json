@@ -4,7 +4,7 @@
   "category": "arithmetic",
   "description": "Cube Roots drill.",
   "difficulty_notes": "0.0 = perfect cubes, 1.0 = irrational, decimal-rounded",
-  "implemented": false,
+  "implemented": true,
   "prerequisites": [
     "cubes"
   ]

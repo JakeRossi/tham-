@@ -7,20 +7,40 @@ directly, so adding a new drill only requires: (1) implement the class,
 
 from __future__ import annotations
 
-from app.drills.arithmetic import AdditionDrill, SubtractionDrill
+from app.drills.algebra import AlgebraicManipulationDrill
+from app.drills.arithmetic import (
+    AdditionDrill,
+    CbrtsDrill,
+    CubesDrill,
+    DivisionDrill,
+    MultiplicationDrill,
+    SqrtsDrill,
+    SquaresDrill,
+    SubtractionDrill,
+)
 from app.drills.base import Drill
-from app.drills.calculus import DerivativesDrill
+from app.drills.calculus import DerivativesDrill, IntegralsDrill
+from app.drills.diffeq import OdePdeDrill
+from app.drills.linalg import RREFDrill
+from app.drills.trig import TrigValuesDrill
 
 REGISTRY: dict[str, Drill] = {
     d.id: d
     for d in [
         AdditionDrill(),
         SubtractionDrill(),
+        MultiplicationDrill(),
+        DivisionDrill(),
+        SquaresDrill(),
+        SqrtsDrill(),
+        CubesDrill(),
+        CbrtsDrill(),
+        TrigValuesDrill(),
+        AlgebraicManipulationDrill(),
         DerivativesDrill(),
-        # TODO: MultiplicationDrill, DivisionDrill, SquaresDrill, SqrtsDrill,
-        #       CubesDrill, CbrtsDrill, TrigValuesDrill, AlgebraicManipulationDrill,
-        #       IntegralsDrill, RREFDrill, OdePdeDrill -- once implemented in
-        #       app/drills/*.py, register them here.
+        IntegralsDrill(),
+        RREFDrill(),
+        OdePdeDrill(),
     ]
 }
 

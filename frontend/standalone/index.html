@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>math-osu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #12111a;
+    --bg-raised: #1c1a29;
+    --pink: #ff5da2;
+    --pink-glow: #ff5da2aa;
+    --cyan: #4eeaff;
+    --text: #f2f0f8;
+    --text-dim: #9d98b3;
+    --gold: #ffd166;
+
+    /* per-category accent colors -- this is the signature: the math
+       category itself drives color, not arbitrary decoration */
+    --cat-arithmetic: #4eeaff;
+    --cat-algebra: #b98bff;
+    --cat-trigonometry: #ffb84e;
+    --cat-calculus: #ff5da2;
+    --cat-linear-algebra: #5dff9d;
+    --cat-differential-equations: #ff5d5d;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: radial-gradient(ellipse at top, #201d2e 0%, #12111a 60%);
+    color: var(--text);
+    font-family: 'Rubik', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 64px;
+  }
+
+  h1, h2, h3 { font-family: 'Space Grotesk', sans-serif; margin: 0; }
+
+  .app { width: 100%; max-width: 960px; }
+
+  /* ---------- header ---------- */
+  .header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .logo {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--pink); }
+  .user-tag { color: var(--text-dim); font-size: 13px; }
+
+  /* ---------- select screen ---------- */
+  .warmup-banner {
+    background: linear-gradient(135deg, var(--pink) 0%, #a238ff 100%);
+    border-radius: 18px;
+    padding: 22px 28px;
+    margin-bottom: 24px;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+    box-shadow: 0 8px 30px -8px var(--pink-glow);
+  }
+  .warmup-banner:hover { transform: translateY(-2px); }
+  .warmup-banner h2 { font-size: 22px; }
+  .warmup-banner p { margin: 6px 0 0; opacity: 0.9; font-size: 14px; }
+
+  .section-label {
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin: 24px 0 10px;
+  }
+
+  .map-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+  }
+
+  .map-card {
+    background: var(--bg-raised);
+    border: 1px solid #2c2940;
+    border-radius: 14px;
+    padding: 18px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .map-card:hover { transform: translateY(-3px); border-color: var(--accent, var(--pink)); }
+  .map-card::before {
+    content: "";
+    position: absolute; inset: 0 0 auto 0; height: 4px;
+    background: var(--accent, var(--pink));
+  }
+  .map-card .cat { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent, var(--pink)); margin-bottom: 6px; }
+  .map-card .name { font-size: 17px; font-weight: 500; margin-bottom: 4px; }
+  .map-card .mastery-bar {
+    height: 5px; background: #2c2940; border-radius: 3px; margin-top: 12px; overflow: hidden;
+  }
+  .map-card .mastery-fill { height: 100%; background: var(--accent, var(--pink)); width: 0%; transition: width 0.3s; }
+
+  /* ---------- gameplay screen ---------- */
+  .game-screen { text-align: center; }
+
+  .hud {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 40px; font-family: 'Space Grotesk', sans-serif;
+  }
+  .hud .stat { text-align: center; }
+  .hud .stat .value { font-size: 26px; font-weight: 700; }
+  .hud .stat .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+  .hud .combo .value { color: var(--gold); }
+
+  .hit-circle {
+    width: 220px; height: 220px; border-radius: 50%;
+    border: 5px solid var(--accent, var(--pink));
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 28px; position: relative;
+    background: radial-gradient(circle, #201d2e 60%, transparent 100%);
+    box-shadow: 0 0 40px -10px var(--accent, var(--pink));
+  }
+  .hit-circle .timer-ring {
+    position: absolute; inset: -5px;
+    border-radius: 50%;
+  }
+  .hit-circle .prompt {
+    font-size: 22px; font-weight: 500; padding: 0 20px; word-break: break-word;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  .answer-row { display: flex; gap: 10px; justify-content: center; margin-bottom: 18px; }
+  .answer-input {
+    background: var(--bg-raised); border: 2px solid #2c2940; border-radius: 12px;
+    color: var(--text); font-size: 20px; padding: 14px 18px; width: 260px;
+    text-align: center; font-family: 'Space Grotesk', sans-serif;
+  }
+  .answer-input:focus { outline: none; border-color: var(--accent, var(--pink)); }
+
+  .btn {
+    background: var(--accent, var(--pink)); color: #12111a; border: none;
+    border-radius: 12px; padding: 14px 24px; font-size: 16px; font-weight: 700;
+    cursor: pointer; font-family: 'Space Grotesk', sans-serif;
+    transition: transform 0.1s ease, opacity 0.15s ease;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+  .btn.secondary { background: transparent; color: var(--text); border: 1px solid #3a3650; }
+
+  .hint-box {
+    background: var(--bg-raised); border: 1px dashed var(--accent, var(--pink));
+    border-radius: 12px; padding: 14px 18px; margin: 16px auto; max-width: 480px;
+    font-size: 14px; color: var(--text-dim); text-align: left;
+  }
+  .hint-box .hint-line { margin: 4px 0; color: var(--text); }
+
+  .feedback {
+    font-size: 18px; font-weight: 700; margin: 14px 0; min-height: 26px;
+  }
+  .feedback.correct { color: #5dff9d; }
+  .feedback.wrong { color: #ff5d5d; }
+
+  .bottom-actions { margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
+
+  /* ---------- results screen ---------- */
+  .results-screen { text-align: center; }
+  .rank {
+    font-size: 120px; font-weight: 900; font-family: 'Space Grotesk', sans-serif;
+    line-height: 1; margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--gold), var(--pink));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .results-stats {
+    display: flex; justify-content: center; gap: 40px; margin: 24px 0 32px;
+  }
+  .results-stats .stat .value { font-size: 30px; font-weight: 700; }
+  .results-stats .stat .label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+  .mastery-breakdown { text-align: left; max-width: 480px; margin: 0 auto 28px; }
+  .mastery-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+  .mastery-row .name { width: 140px; color: var(--text-dim); }
+  .mastery-row .bar { flex: 1; height: 8px; background: #2c2940; border-radius: 4px; overflow: hidden; }
+  .mastery-row .bar-fill { height: 100%; }
+
+  .status-msg { color: var(--text-dim); font-size: 14px; margin-top: 40px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">math<span>-osu</span></div>
+    <div class="user-tag" id="userTag">local player</div>
+  </div>
+
+  <!-- SELECT SCREEN -->
+  <div id="selectScreen">
+    <div class="warmup-banner" id="warmupBanner">
+      <h2>Warm Up</h2>
+      <p>20 questions across every drill -- anything you're weak on gets extra reps automatically.</p>
+    </div>
+    <div class="section-label">Drills</div>
+    <div class="map-grid" id="mapGrid"></div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="gameScreen" class="game-screen hidden">
+    <div class="hud">
+      <div class="stat">
+        <div class="value" id="scoreVal">0</div>
+        <div class="label">Score</div>
+      </div>
+      <div class="stat combo">
+        <div class="value" id="comboVal">0x</div>
+        <div class="label">Combo</div>
+      </div>
+      <div class="stat">
+        <div class="value" id="accuracyVal">100%</div>
+        <div class="label">Accuracy</div>
+      </div>
+    </div>
+
+    <div class="hit-circle" id="hitCircle">
+      <div class="prompt" id="promptText">Loading...</div>
+    </div>
+
+    <div class="answer-row">
+      <input class="answer-input" id="answerInput" type="text" placeholder="your answer" autocomplete="off" />
+      <button class="btn" id="submitBtn">Submit</button>
+    </div>
+
+    <div class="feedback" id="feedbackText"></div>
+
+    <div id="hintBox" class="hint-box hidden"></div>
+
+    <div class="bottom-actions">
+      <button class="btn secondary" id="hintBtn" disabled>Hint</button>
+      <button class="btn secondary" id="endBtn">End session</button>
+    </div>
+  </div>
+
+  <!-- RESULTS SCREEN -->
+  <div id="resultsScreen" class="results-screen hidden">
+    <div class="rank" id="rankLetter">S</div>
+    <div class="results-stats">
+      <div class="stat"><div class="value" id="finalScore">0</div><div class="label">Score</div></div>
+      <div class="stat"><div class="value" id="finalAccuracy">0%</div><div class="label">Accuracy</div></div>
+      <div class="stat"><div class="value" id="finalCombo">0x</div><div class="label">Max Combo</div></div>
+    </div>
+    <div class="mastery-breakdown" id="masteryBreakdown"></div>
+    <div class="bottom-actions">
+      <button class="btn" id="playAgainBtn">Play again</button>
+      <button class="btn secondary" id="backToSelectBtn">Back to select</button>
+    </div>
+  </div>
+
+  <div class="status-msg" id="statusMsg"></div>
+</div>
+
+<script>
+const API_BASE = "http://localhost:8000";
+const USER_ID = "local";
+
+const CATEGORY_COLORS = {
+  "arithmetic": "var(--cat-arithmetic)",
+  "algebra": "var(--cat-algebra)",
+  "trigonometry": "var(--cat-trigonometry)",
+  "calculus": "var(--cat-calculus)",
+  "linear-algebra": "var(--cat-linear-algebra)",
+  "differential-equations": "var(--cat-differential-equations)",
+};
+
+const el = (id) => document.getElementById(id);
+const screens = { select: el("selectScreen"), game: el("gameScreen"), results: el("resultsScreen") };
+function showScreen(name) {
+  Object.values(screens).forEach(s => s.classList.add("hidden"));
+  screens[name].classList.remove("hidden");
+}
+function setStatus(msg) { el("statusMsg").textContent = msg; }
+
+async function api(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = (await res.json()).detail || detail; } catch (e) {}
+    throw new Error(`${path} failed: ${detail}`);
+  }
+  return res.json();
+}
+
+// ---------------- SELECT SCREEN ----------------
+
+async function loadMapGrid() {
+  setStatus("Loading drills from backend...");
+  try {
+    const data = await api("/api/maps/builtin");
+    const grid = el("mapGrid");
+    grid.innerHTML = "";
+    const implemented = data.maps.filter(m => m.implemented);
+    for (const m of implemented) {
+      const color = CATEGORY_COLORS[m.category] || "var(--pink)";
+      const card = document.createElement("div");
+      card.className = "map-card";
+      card.style.setProperty("--accent", color);
+      card.innerHTML = `
+        <div class="cat">${m.category}</div>
+        <div class="name">${m.name}</div>
+        <div class="mastery-bar"><div class="mastery-fill"></div></div>
+      `;
+      card.addEventListener("click", () => startPractice(m.id, color));
+      grid.appendChild(card);
+    }
+    setStatus(implemented.length ? "" : "No implemented drills found -- check the backend is up to date.");
+  } catch (e) {
+    setStatus(`Could not reach backend at ${API_BASE} -- is it running? (${e.message})`);
+  }
+}
+
+el("warmupBanner").addEventListener("click", startWarmup);
+
+// ---------------- SHARED GAME STATE ----------------
+
+let mode = null;          // "practice" | "warmup"
+let currentDrillId = null;
+let currentAccent = "var(--pink)";
+let currentProblem = null;
+let currentSettings = null;
+let warmupSessionId = null;
+
+let score = 0, combo = 0, maxCombo = 0, correctCount = 0, totalCount = 0;
+let hintsRevealed = 0, usedHintThisProblem = false;
+let questionStartTime = 0, hintTimeoutHandle = null, timerIntervalHandle = null;
+let timeLimit = 20;
+
+function resetSessionStats() {
+  score = 0; combo = 0; maxCombo = 0; correctCount = 0; totalCount = 0;
+  updateHud();
+}
+function updateHud() {
+  el("scoreVal").textContent = score;
+  el("comboVal").textContent = `${combo}x`;
+  const acc = totalCount ? Math.round((correctCount / totalCount) * 100) : 100;
+  el("accuracyVal").textContent = `${acc}%`;
+}
+
+// ---------------- PRACTICE MODE ----------------
+
+async function startPractice(drillId, accent) {
+  mode = "practice";
+  currentDrillId = drillId;
+  currentAccent = accent;
+  resetSessionStats();
+  showScreen("game");
+  el("hitCircle").style.setProperty("--accent", accent);
+  el("hintBtn").style.setProperty("--accent", accent);
+  await loadNextPracticeProblem();
+}
+
+async function loadNextPracticeProblem() {
+  clearTimers();
+  setStatus("");
+  el("feedbackText").textContent = "";
+  el("hintBox").classList.add("hidden");
+  el("hintBox").innerHTML = "";
+  el("answerInput").value = "";
+  el("answerInput").focus();
+  hintsRevealed = 0;
+  usedHintThisProblem = false;
+
+  try {
+    const data = await api(`/api/problems/next/${currentDrillId}?user_id=${USER_ID}`);
+    currentProblem = data;
+    currentSettings = data;
+    timeLimit = data.time_limit_seconds;
+    el("promptText").textContent = data.prompt;
+    questionStartTime = Date.now();
+
+    const hintBtn = el("hintBtn");
+    hintBtn.disabled = true;
+    if (data.max_hints > 0) {
+      hintTimeoutHandle = setTimeout(() => { hintBtn.disabled = false; }, data.hint_delay_seconds * 1000);
+    }
+  } catch (e) {
+    setStatus(`Error loading problem: ${e.message}`);
+  }
+}
+
+el("hintBtn").addEventListener("click", () => {
+  if (!currentProblem || hintsRevealed >= currentProblem.hints.length) return;
+  const hint = currentProblem.hints[hintsRevealed];
+  hintsRevealed += 1;
+  usedHintThisProblem = true;
+  const box = el("hintBox");
+  box.classList.remove("hidden");
+  const line = document.createElement("div");
+  line.className = "hint-line";
+  line.textContent = hint;
+  box.appendChild(line);
+  if (hintsRevealed >= currentProblem.hints.length) el("hintBtn").disabled = true;
+});
+
+async function submitPracticeAnswer() {
+  const submitted = el("answerInput").value.trim();
+  if (!submitted || !currentProblem) return;
+  clearTimers();
+  const timeTaken = (Date.now() - questionStartTime) / 1000;
+
+  try {
+    const result = await api("/api/problems/submit", {
+      method: "POST",
+      body: JSON.stringify({
+        drill_id: currentProblem.drill_id,
+        prompt: currentProblem.prompt,
+        answer: currentProblem.answer,
+        submitted,
+        used_hint: usedHintThisProblem,
+        time_taken_seconds: timeTaken,
+        time_limit_seconds: timeLimit,
+        user_id: USER_ID,
+      }),
+    });
+
+    totalCount += 1;
+    const fb = el("feedbackText");
+    if (result.correct) {
+      correctCount += 1;
+      combo += 1;
+      maxCombo = Math.max(maxCombo, combo);
+      const speedBonus = Math.max(0, 1 - timeTaken / timeLimit);
+      const hintPenalty = usedHintThisProblem ? 0.5 : 1;
+      const points = Math.round((100 + combo * 10) * (0.5 + speedBonus * 0.5) * hintPenalty);
+      score += points;
+      fb.textContent = `Correct! +${points}`;
+      fb.className = "feedback correct";
+    } else {
+      combo = 0;
+      fb.textContent = result.feedback || "Not quite.";
+      fb.className = "feedback wrong";
+    }
+    updateHud();
+    setTimeout(loadNextPracticeProblem, 900);
+  } catch (e) {
+    setStatus(`Error submitting answer: ${e.message}`);
+  }
+}
+
+function submitCurrentAnswer() {
+  if (mode === "warmup") submitWarmupAnswer();
+  else submitPracticeAnswer();
+}
+el("submitBtn").addEventListener("click", submitCurrentAnswer);
+el("answerInput").addEventListener("keydown", (e) => { if (e.key === "Enter") submitCurrentAnswer(); });
+
+// ---------------- WARM-UP MODE ----------------
+
+async function startWarmup() {
+  mode = "warmup";
+  resetSessionStats();
+  showScreen("game");
+  currentAccent = "var(--pink)";
+  el("hitCircle").style.setProperty("--accent", currentAccent);
+  el("hintBtn").style.setProperty("--accent", currentAccent);
+  setStatus("Starting warm-up...");
+
+  try {
+    const data = await api("/api/sessions/warmup/start", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    warmupSessionId = data.session_id;
+    setStatus("");
+    await loadNextWarmupProblem();
+  } catch (e) {
+    setStatus(`Error starting warm-up: ${e.message}`);
+  }
+}
+
+async function loadNextWarmupProblem() {
+  clearTimers();
+  el("feedbackText").textContent = "";
+  el("hintBox").classList.add("hidden");
+  el("hintBox").innerHTML = "";
+  el("answerInput").value = "";
+  el("answerInput").focus();
+  hintsRevealed = 0;
+  usedHintThisProblem = false;
+
+  const data = await api(`/api/sessions/warmup/${warmupSessionId}/next`);
+  if (data.complete) {
+    showWarmupResults(data.mastery);
+    return;
+  }
+  currentProblem = data;
+  // warm-up mixes drills from every category, so keep the ring neutral pink
+  // rather than switching color every problem
+  el("hitCircle").style.setProperty("--accent", "var(--pink)");
+  el("promptText").textContent = data.prompt;
+  el("hintBtn").disabled = data.hints.length === 0;
+  timeLimit = 20;
+  questionStartTime = Date.now();
+}
+
+async function submitWarmupAnswer() {
+  const submitted = el("answerInput").value.trim();
+  if (!submitted || !currentProblem) return;
+  clearTimers();
+  const timeTaken = (Date.now() - questionStartTime) / 1000;
+
+  const checkResult = await api("/api/problems/submit", {
+    method: "POST",
+    body: JSON.stringify({
+      drill_id: currentProblem.drill_id,
+      prompt: currentProblem.prompt,
+      answer: currentProblem.answer,
+      submitted,
+      used_hint: usedHintThisProblem,
+      time_taken_seconds: timeTaken,
+      time_limit_seconds: timeLimit,
+      user_id: USER_ID,
+    }),
+  });
+
+  await api("/api/sessions/warmup/attempt", {
+    method: "POST",
+    body: JSON.stringify({
+      session_id: warmupSessionId,
+      drill_id: currentProblem.drill_id,
+      correct: checkResult.correct,
+      used_hint: usedHintThisProblem,
+      time_taken_seconds: timeTaken,
+      time_limit_seconds: timeLimit,
+    }),
+  });
+
+  totalCount += 1;
+  const fb = el("feedbackText");
+  if (checkResult.correct) {
+    correctCount += 1;
+    combo += 1;
+    maxCombo = Math.max(maxCombo, combo);
+    score += 100 + combo * 10;
+    fb.textContent = "Correct!";
+    fb.className = "feedback correct";
+  } else {
+    combo = 0;
+    fb.textContent = checkResult.feedback || "Not quite.";
+    fb.className = "feedback wrong";
+  }
+  updateHud();
+  setTimeout(loadNextWarmupProblem, 700);
+}
+
+function showWarmupResults(masteryMap) {
+  score += 0; // final score already accumulated
+  showResultsCommon();
+  const breakdown = el("masteryBreakdown");
+  breakdown.innerHTML = "<div class='section-label' style='margin-top:0'>Mastery after warm-up</div>";
+  Object.entries(masteryMap).sort((a, b) => a[1] - b[1]).forEach(([drillId, mastery]) => {
+    const pct = Math.round(mastery * 100);
+    const row = document.createElement("div");
+    row.className = "mastery-row";
+    row.innerHTML = `
+      <div class="name">${drillId}</div>
+      <div class="bar"><div class="bar-fill" style="width:${pct}%; background:${pct < 40 ? '#ff5d5d' : pct < 70 ? '#ffd166' : '#5dff9d'}"></div></div>
+      <div>${pct}%</div>
+    `;
+    breakdown.appendChild(row);
+  });
+}
+
+// ---------------- END SESSION / RESULTS ----------------
+
+el("endBtn").addEventListener("click", () => {
+  clearTimers();
+  if (mode === "warmup") {
+    showResultsCommon();
+    el("masteryBreakdown").innerHTML = "<div class='section-label'>Session ended early -- no full mastery breakdown.</div>";
+  } else {
+    showResultsCommon();
+    el("masteryBreakdown").innerHTML = "";
+  }
+});
+
+function showResultsCommon() {
+  showScreen("results");
+  const acc = totalCount ? Math.round((correctCount / totalCount) * 100) : 0;
+  el("finalScore").textContent = score;
+  el("finalAccuracy").textContent = `${acc}%`;
+  el("finalCombo").textContent = `${maxCombo}x`;
+
+  let rank = "D";
+  if (acc >= 95) rank = "S";
+  else if (acc >= 85) rank = "A";
+  else if (acc >= 70) rank = "B";
+  else if (acc >= 50) rank = "C";
+  el("rankLetter").textContent = rank;
+}
+
+el("playAgainBtn").addEventListener("click", () => {
+  if (mode === "practice") startPractice(currentDrillId, currentAccent);
+  else startWarmup();
+});
+el("backToSelectBtn").addEventListener("click", () => {
+  showScreen("select");
+  loadMapGrid();
+});
+
+function clearTimers() {
+  if (hintTimeoutHandle) clearTimeout(hintTimeoutHandle);
+  if (timerIntervalHandle) clearInterval(timerIntervalHandle);
+}
+
+// ---------------- INIT ----------------
+showScreen("select");
+loadMapGrid();
+</script>
+</body>
+</html>

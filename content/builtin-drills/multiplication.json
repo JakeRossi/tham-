@@ -4,7 +4,7 @@
   "category": "arithmetic",
   "description": "Multiplication drill.",
   "difficulty_notes": "0.0 = single digit x single digit, 1.0 = 3-digit x 2-digit",
-  "implemented": false,
+  "implemented": true,
   "prerequisites": [
     "addition"
   ]

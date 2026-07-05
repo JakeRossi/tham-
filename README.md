@@ -8,18 +8,26 @@ leaderboard ("map").
 
 ## Status
 
-Early scaffold. Working today:
-- `addition` / `subtraction` drills (arithmetic)
-- `derivatives` drill (single-variable + partial, sympy-backed, accepts
-  any algebraically equivalent answer)
-- Warm-up mechanic: 20-question calibration round that extends practice
-  for any concept you're weak on
-- FastAPI skeleton with problem generation, warm-up sessions, leaderboard
-  and textbook-upload endpoints (leaderboard + upload are stubs)
+Working today:
+- **All 14 drills implemented** with generation + answer-checking tests
+  (addition, subtraction, multiplication, division, squares, sqrts, cubes,
+  cbrts, trig values, algebraic manipulation, derivatives, integrals,
+  RREF, ODE basics). 74 backend tests passing.
+- **Mastery -> difficulty/hints algorithm is fully wired into the live
+  API** (`GET /api/problems/next/{drill_id}`): problem difficulty, time
+  limit, hint count, and hint delay all actually change based on how
+  well you're doing, not a fixed value.
+- **Warm-up mechanic**: 20-question calibration round that extends
+  practice for anything you're weak on, exposed via
+  `POST /api/sessions/warmup/*`.
+- **A playable UI** at `frontend/standalone/index.html` -- no build step,
+  osu!-styled, pick a drill and play, or run the full warm-up. See
+  `frontend/standalone/README.md` to run it.
 
-Not built yet: everything in `content/builtin-drills/*.json` with
-`"implemented": false`, the textbook parsing pipeline, the real frontend,
-persistent storage (everything is in-memory right now).
+Not built yet: the polished React app in `frontend/src/` (the standalone
+HTML is a functional stand-in for now), persistent storage (everything's
+in-memory and resets on backend restart), textbook upload/parsing, and
+real leaderboards (endpoint exists, but stores nothing durable yet).
 
 ## Repo layout
 
@@ -30,6 +38,15 @@ persistent storage (everything is in-memory right now).
 - `scripts/` -- dev setup helpers
 
 See `docs/ARCHITECTURE.md` for the full picture.
+
+## Play it right now
+
+The fastest path to actually playing:
+```bash
+cd backend && uvicorn app.main:app --reload &
+cd frontend/standalone && python3 -m http.server 5500
+```
+Then open http://localhost:5500. See `frontend/standalone/README.md` for details.
 
 ## Getting started (backend)
 

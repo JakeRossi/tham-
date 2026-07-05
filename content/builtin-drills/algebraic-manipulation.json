@@ -4,7 +4,7 @@
   "category": "algebra",
   "description": "Algebraic Manipulation drill.",
   "difficulty_notes": "0.0 = combine like terms, 1.0 = multi-step factoring/expansion",
-  "implemented": false,
+  "implemented": true,
   "prerequisites": [
     "addition",
     "multiplication"

@@ -93,7 +93,7 @@ class DerivativesDrill(Drill):
             submitted_expr = sp.sympify(submitted, locals={"x": x, "y": y})
             answer_expr = sp.sympify(norm_answer, locals={"x": x, "y": y})
             correct = sp.simplify(submitted_expr - answer_expr) == 0
-        except (sp.SympifyError, TypeError, ValueError):
+        except Exception:  # broad on purpose -- garbage input fails in many different ways
             correct = False
 
         return CheckResult(
@@ -104,11 +104,64 @@ class DerivativesDrill(Drill):
         )
 
 
-# --- TODO: implement following the same pattern as DerivativesDrill above ---
-#
-# class IntegralsDrill(Drill):
-#     id = "integrals"
-#     # definite integrals: use sp.integrate(expr, (x, a, b))
-#     # line integrals: needs a parametrized curve + vector field -- more setup,
-#     #   consider this a "stretch" drill, lowest priority to implement
-#     ...
+class IntegralsDrill(Drill):
+    """
+    Definite integrals of single-variable polynomials: integral of expr dx from a to b.
+
+    NOTE: line integrals (integral over a parametrized curve of a vector
+    field) are NOT implemented here -- they need a meaningfully different
+    problem shape (a curve + a vector field, not just an expr + bounds).
+    Left as a future extension; see docs/DRILL_AUTHORING.md.
+    """
+
+    id = "integrals"
+
+    def generate(self, difficulty: float, rng_seed: int | None = None) -> Problem:
+        rng = random.Random(rng_seed)
+        max_degree = _degree_for_difficulty(difficulty)
+        expr = _random_polynomial(rng, max_degree)
+
+        # Keep bounds small and integer so the arithmetic stays clean-ish.
+        bound_range = 2 + int(difficulty * 4)
+        a = rng.randint(-bound_range, bound_range)
+        b = rng.randint(-bound_range, bound_range)
+        if a == b:
+            b += 1
+        if a > b:
+            a, b = b, a
+
+        definite_value = sp.integrate(expr, (x, a, b))
+        answer_str = sp.sstr(sp.simplify(definite_value))
+
+        antiderivative = sp.integrate(expr, x)
+        hints = [
+            f"First find the antiderivative of {sp.sstr(expr)} with respect to x.",
+            f"The antiderivative is {sp.sstr(antiderivative)} + C. "
+            f"Evaluate it at x={b} and x={a}, then subtract.",
+            f"The answer is {answer_str}.",
+        ]
+
+        return Problem(
+            drill_id=self.id,
+            prompt=f"Evaluate: integral from {a} to {b} of ( {sp.sstr(expr)} ) dx",
+            answer=answer_str,
+            difficulty=difficulty,
+            seed={"expr": str(expr), "a": a, "b": b},
+            hints=hints,
+        )
+
+    def check(self, problem: Problem, submitted: str) -> CheckResult:
+        norm_answer = problem.answer.strip()
+        try:
+            submitted_expr = sp.sympify(submitted)
+            answer_expr = sp.sympify(norm_answer)
+            correct = sp.simplify(submitted_expr - answer_expr) == 0
+        except Exception:  # broad on purpose -- garbage input fails in many different ways
+            correct = False
+
+        return CheckResult(
+            correct=correct,
+            normalized_submitted=str(submitted).strip(),
+            normalized_answer=norm_answer,
+            feedback=None if correct else f"Not quite -- the answer was {norm_answer}.",
+        )

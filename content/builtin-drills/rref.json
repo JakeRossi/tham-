@@ -4,7 +4,7 @@
   "category": "linear-algebra",
   "description": "Reduced Row Echelon Form drill.",
   "difficulty_notes": "0.0 = 2x2 systems, 1.0 = 4x4+ with free variables",
-  "implemented": false,
+  "implemented": true,
   "prerequisites": [
     "algebraic-manipulation"
   ]
