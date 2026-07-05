@@ -19,6 +19,7 @@ import random
 import sympy as sp
 
 from app.drills.base import CheckResult, Drill, Problem
+from app.drills.expr_utils import parse_user_expr, pretty_str
 
 x = sp.symbols("x")
 y = sp.Function("y")
@@ -47,18 +48,19 @@ class OdePdeDrill(Drill):
         y0 = rng.randint(1, 5)
 
         solution = y0 * sp.exp(k * x)
-        answer_str = sp.sstr(solution)
+        answer_str = pretty_str(solution)
+        ky_display = pretty_str(k * x)  # e.g. "3x" instead of "3*x"
 
         hints = [
             "This is a separable ODE: move all y terms to one side, all x terms to the other.",
-            f"Integrating both sides gives ln|y| = {k}x + C, so y = A*exp({k}x) for some constant A. "
-            f"Use y(0) = {y0} to solve for A.",
+            f"Integrating both sides gives ln|y| = {ky_display} + C, so y = A*exp({ky_display}) "
+            f"for some constant A. Use y(0) = {y0} to solve for A.",
             f"The answer is {answer_str}.",
         ]
 
         return Problem(
             drill_id=self.id,
-            prompt=f"Solve: dy/dx = {k}*y, with y(0) = {y0}. Find y(x).",
+            prompt=f"Solve: dy/dx = {k}y, with y(0) = {y0}. Find y(x).",
             answer=answer_str,
             difficulty=difficulty,
             seed={"k": k, "y0": y0},
@@ -74,10 +76,10 @@ class OdePdeDrill(Drill):
         """
         norm_answer = problem.answer.strip()
         try:
-            submitted_expr = sp.sympify(submitted, locals={"x": x})
-            answer_expr = sp.sympify(norm_answer, locals={"x": x})
+            submitted_expr = parse_user_expr(submitted, {"x": x})
+            answer_expr = parse_user_expr(norm_answer, {"x": x})
             if not (hasattr(submitted_expr, "subs") and hasattr(answer_expr, "subs")):
-                raise TypeError("sympify did not produce a substitutable expression")
+                raise TypeError("parsing did not produce a substitutable expression")
             sample_points = [-1, 0, 0.5, 1, 2]
             correct = all(
                 abs(float(submitted_expr.subs(x, pt)) - float(answer_expr.subs(x, pt))) < 1e-6
@@ -85,7 +87,7 @@ class OdePdeDrill(Drill):
             )
         except Exception:
             # Broad catch is intentional: garbage input can fail in many different
-            # ways depending on how sympify happens to parse it (SympifyError,
+            # ways depending on how parsing happens to handle it (SympifyError,
             # TypeError, ValueError, AttributeError, complex results, etc.) --
             # all of them should just mean "not correct," never a 500.
             correct = False

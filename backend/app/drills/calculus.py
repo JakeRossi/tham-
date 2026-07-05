@@ -8,6 +8,12 @@ Key idea: because sympy can both GENERATE a random expression and
 symbolically CHECK whether a submitted answer is equivalent to the true
 derivative (even if written differently, e.g. "2*x+5" vs "5+2*x"), we get
 free-form answer entry instead of multiple choice.
+
+Prompts are rendered as LaTeX (wrapped in $$...$$) so the frontend can
+show proper mathematical notation instead of ASCII "d/dx [ ... ]" text --
+see frontend/standalone/index.html's renderMathOrText(). Canonical answers
+(used for grading, not display) still use expr_utils.pretty_str/
+parse_user_expr so "6x" and "6*x" are accepted identically.
 """
 
 from __future__ import annotations
@@ -17,6 +23,7 @@ import random
 import sympy as sp
 
 from app.drills.base import CheckResult, Drill, Problem
+from app.drills.expr_utils import parse_user_expr, pretty_str
 
 x, y = sp.symbols("x y")
 
@@ -53,7 +60,7 @@ class DerivativesDrill(Drill):
         if difficulty < 0.5:
             expr = _random_polynomial(rng, max_degree)
             derivative = sp.diff(expr, x)
-            prompt = f"d/dx [ {sp.sstr(expr)} ] = ?"
+            prompt = f"$$\\frac{{d}}{{dx}}\\left[ {sp.latex(expr)} \\right]$$"
             var_name = "x"
         else:
             # two-variable expression, partial derivative w.r.t. a randomly chosen var
@@ -63,15 +70,16 @@ class DerivativesDrill(Drill):
             wrt = rng.choice([x, y])
             derivative = sp.diff(expr, wrt)
             var_name = str(wrt)
-            prompt = f"∂/∂{var_name} [ {sp.sstr(expr)} ] = ?"
+            prompt = f"$$\\frac{{\\partial}}{{\\partial {var_name}}}\\left[ {sp.latex(expr)} \\right]$$"
 
-        answer_str = sp.sstr(sp.expand(derivative))
+        target = sp.expand(derivative)
+        answer_str = pretty_str(target)
 
         hints = [
             f"Differentiate term by term with respect to {var_name}.",
             "Recall the power rule: d/dx[x^n] = n*x^(n-1). Constants and other-variable "
             "terms not containing the variable you're differentiating w.r.t. drop to 0.",
-            f"The answer is {answer_str}.",
+            f"The answer is $$ {sp.latex(target)} $$",
         ]
 
         return Problem(
@@ -86,12 +94,13 @@ class DerivativesDrill(Drill):
     def check(self, problem: Problem, submitted: str) -> CheckResult:
         """
         Symbolic equivalence check -- accepts any algebraically equivalent
-        form of the answer, not just an exact string match.
+        form of the answer (including implicit multiplication like '6x'),
+        not just an exact string match.
         """
         norm_answer = problem.answer.strip()
         try:
-            submitted_expr = sp.sympify(submitted, locals={"x": x, "y": y})
-            answer_expr = sp.sympify(norm_answer, locals={"x": x, "y": y})
+            submitted_expr = parse_user_expr(submitted, {"x": x, "y": y})
+            answer_expr = parse_user_expr(norm_answer, {"x": x, "y": y})
             correct = sp.simplify(submitted_expr - answer_expr) == 0
         except Exception:  # broad on purpose -- garbage input fails in many different ways
             correct = False
@@ -131,19 +140,21 @@ class IntegralsDrill(Drill):
             a, b = b, a
 
         definite_value = sp.integrate(expr, (x, a, b))
-        answer_str = sp.sstr(sp.simplify(definite_value))
+        target = sp.simplify(definite_value)
+        answer_str = pretty_str(target)
 
         antiderivative = sp.integrate(expr, x)
+        prompt = f"$$\\int_{{{a}}}^{{{b}}} {sp.latex(expr)} \\, dx$$"
         hints = [
-            f"First find the antiderivative of {sp.sstr(expr)} with respect to x.",
-            f"The antiderivative is {sp.sstr(antiderivative)} + C. "
+            f"First find the antiderivative of the integrand with respect to x.",
+            f"The antiderivative is $$ {sp.latex(antiderivative)} + C $$ "
             f"Evaluate it at x={b} and x={a}, then subtract.",
-            f"The answer is {answer_str}.",
+            f"The answer is $$ {sp.latex(target)} $$",
         ]
 
         return Problem(
             drill_id=self.id,
-            prompt=f"Evaluate: integral from {a} to {b} of ( {sp.sstr(expr)} ) dx",
+            prompt=prompt,
             answer=answer_str,
             difficulty=difficulty,
             seed={"expr": str(expr), "a": a, "b": b},
@@ -153,8 +164,8 @@ class IntegralsDrill(Drill):
     def check(self, problem: Problem, submitted: str) -> CheckResult:
         norm_answer = problem.answer.strip()
         try:
-            submitted_expr = sp.sympify(submitted)
-            answer_expr = sp.sympify(norm_answer)
+            submitted_expr = parse_user_expr(submitted)
+            answer_expr = parse_user_expr(norm_answer)
             correct = sp.simplify(submitted_expr - answer_expr) == 0
         except Exception:  # broad on purpose -- garbage input fails in many different ways
             correct = False

@@ -1,6 +1,7 @@
 import sympy as sp
 
 from app.drills.diffeq import OdePdeDrill, x
+from app.drills.expr_utils import parse_user_expr
 
 
 def test_solution_satisfies_the_ode_and_initial_condition():
@@ -8,7 +9,7 @@ def test_solution_satisfies_the_ode_and_initial_condition():
     for seed in range(20):
         problem = drill.generate(0.4, rng_seed=seed)
         k, y0 = problem.seed["k"], problem.seed["y0"]
-        y_expr = sp.sympify(problem.answer)
+        y_expr = parse_user_expr(problem.answer, {'x': x})
 
         # dy/dx should equal k*y
         dy_dx = sp.diff(y_expr, x)

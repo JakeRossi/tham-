@@ -29,15 +29,26 @@ to run the 20-question calibration round across every drill.
 ## What it does
 
 - **Song select**: pulls the list of implemented drills from
-  `GET /api/maps/builtin`, color-coded by category.
+  `GET /api/maps/builtin`, ordered by difficulty (not alphabetically) and
+  color-coded by category.
 - **Practice mode**: calls `GET /api/problems/next/{drill_id}`, which
   runs the real mastery -> difficulty/hint algorithm (not a fixed
   difficulty) -- so hints and problem difficulty should visibly shift as
-  you play more of one drill.
+  you play more of one drill. Questions won't repeat until every problem
+  in the current difficulty tier's pool has been shown once (shuffle-bag
+  scheduling -- see `backend/app/engine/scheduler.py`).
 - **Warm-up mode**: drives `POST /api/sessions/warmup/*`, matching the
   original "20 questions, extend the ones you're weak on" design.
-- **Scoring**: osu!-style combo multiplier + speed bonus, S/A/B/C/D rank
-  at the end based on accuracy.
+- **Scoring**: osu!-style hint tiers -- answering with no hints scores
+  "300", one hint scores "100", two hints scores "50" (combo keeps
+  climbing through all of these); revealing the final hint (which states
+  the answer outright) breaks your combo and counts as a miss for
+  accuracy, even if you then type the right answer.
+- **Math notation**: derivatives and integrals render as real LaTeX (via
+  KaTeX) instead of ASCII math; algebra/derivative/integral/ODE answers
+  accept "6x" and "6\*x" interchangeably; trig values are in radians using
+  pi notation ("pi/2", "3pi/4") rather than degrees.
+- S/A/B/C/D rank at the end based on that weighted accuracy.
 
 ## Known limitations (intentional, for a fast first playable build)
 

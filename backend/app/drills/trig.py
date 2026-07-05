@@ -1,11 +1,13 @@
 """
 Trig values drill: evaluate sin/cos/tan (and reciprocals at higher
-difficulty) at common or arbitrary angles.
+difficulty) at angles expressed in RADIANS using pi notation
+(e.g. "pi/2", "3pi/4"), not degrees.
 
-difficulty < 0.5: common angles (0, 30, 45, 60, 90, ...) in degrees,
-                  sin/cos/tan only, exact answers (e.g. "sqrt(2)/2" or "1/2").
-difficulty >= 0.5: arbitrary angles, all six functions, decimal answers
-                   accepted within epsilon.
+difficulty < 0.5: common unit-circle angles (multiples of pi/6, pi/4,
+                  etc.), sin/cos/tan only, exact answers
+                  (e.g. "sqrt(2)/2" or "1/2").
+difficulty >= 0.5: arbitrary pi-fraction angles, all six functions,
+                  decimal answers accepted within epsilon.
 """
 
 from __future__ import annotations
@@ -15,10 +17,26 @@ import random
 import sympy as sp
 
 from app.drills.base import CheckResult, Drill, Problem
+from app.drills.expr_utils import parse_user_expr
 
-COMMON_ANGLES_DEG = [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330, 360]
+# Common unit-circle angles as fractions of pi (numerator, denominator).
+COMMON_ANGLE_FRACTIONS = [
+    (0, 1), (1, 6), (1, 4), (1, 3), (1, 2), (2, 3), (3, 4), (5, 6),
+    (1, 1), (7, 6), (5, 4), (4, 3), (3, 2), (5, 3), (7, 4), (11, 6), (2, 1),
+]
+
 BASIC_FUNCS = {"sin": sp.sin, "cos": sp.cos, "tan": sp.tan}
 ALL_FUNCS = {**BASIC_FUNCS, "csc": lambda t: 1 / sp.sin(t), "sec": lambda t: 1 / sp.cos(t), "cot": sp.cot}
+
+
+def format_pi_angle(num: int, den: int) -> str:
+    """(1, 2) -> 'pi/2', (3, 4) -> '3pi/4', (0, 1) -> '0', (1, 1) -> 'pi'."""
+    if num == 0:
+        return "0"
+    sign = "-" if num < 0 else ""
+    num = abs(num)
+    pi_part = "pi" if num == 1 else f"{num}pi"
+    return f"{sign}{pi_part}" if den == 1 else f"{sign}{pi_part}/{den}"
 
 
 class TrigValuesDrill(Drill):
@@ -28,7 +46,7 @@ class TrigValuesDrill(Drill):
     @staticmethod
     def _safe_eval(func, theta) -> sp.Expr | None:
         """Returns the simplified value, or None if it's undefined/complex/infinite
-        (e.g. tan(90deg), csc(180deg))."""
+        (e.g. tan(pi/2), csc(pi))."""
         try:
             val = sp.simplify(func(theta))
         except ZeroDivisionError:
@@ -41,47 +59,53 @@ class TrigValuesDrill(Drill):
         rng = random.Random(rng_seed)
 
         if difficulty < 0.5:
-            angle_deg = rng.choice(COMMON_ANGLES_DEG)
+            num, den = rng.choice(COMMON_ANGLE_FRACTIONS)
             func_name = rng.choice(list(BASIC_FUNCS))
         else:
-            angle_deg = rng.randint(0, 359)
+            den = rng.choice([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+            num = rng.randint(0, 2 * den)
             func_name = rng.choice(list(ALL_FUNCS))
 
         func = ALL_FUNCS[func_name]
-        theta = sp.rad(angle_deg)
-
+        theta = sp.Rational(num, den) * sp.pi
         exact_val = self._safe_eval(func, theta)
+
         attempts = 0
         while exact_val is None and attempts < 20:
-            # e.g. tan(90deg), csc(180deg) undefined -- retry with a new angle
-            angle_deg = rng.choice(COMMON_ANGLES_DEG) if difficulty < 0.5 else rng.randint(0, 359)
-            theta = sp.rad(angle_deg)
+            # e.g. tan(pi/2), csc(pi) undefined -- retry with a new angle
+            if difficulty < 0.5:
+                num, den = rng.choice(COMMON_ANGLE_FRACTIONS)
+            else:
+                den = rng.choice([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+                num = rng.randint(0, 2 * den)
+            theta = sp.Rational(num, den) * sp.pi
             exact_val = self._safe_eval(func, theta)
             attempts += 1
         if exact_val is None:
             # last-resort safe fallback, guaranteed defined for every function in ALL_FUNCS
-            angle_deg = 30
-            theta = sp.rad(angle_deg)
+            num, den = 1, 6
+            theta = sp.Rational(num, den) * sp.pi
             exact_val = self._safe_eval(func, theta)
 
+        angle_str = format_pi_angle(num, den)
+
         if difficulty < 0.5:
-            # exact symbolic form, e.g. "sqrt(3)/2"
-            answer = sp.sstr(exact_val)
+            answer = sp.sstr(exact_val)  # exact symbolic form, e.g. "sqrt(3)/2"
         else:
             answer = f"{float(exact_val):.2f}"
 
         hints = [
-            f"Recall the unit circle position for {angle_deg} degrees.",
-            f"{func_name}({angle_deg} deg) relates to a reference angle within the first quadrant.",
+            f"Recall the unit circle position for {angle_str} radians.",
+            f"{func_name}({angle_str}) relates to a reference angle within the first quadrant.",
             f"The answer is {answer}.",
         ]
 
         return Problem(
             drill_id=self.id,
-            prompt=f"{func_name}({angle_deg} deg) = ?",
+            prompt=f"{func_name}({angle_str}) = ?",
             answer=answer,
             difficulty=difficulty,
-            seed={"angle_deg": angle_deg, "func": func_name},
+            seed={"frac_num": num, "frac_den": den, "func": func_name},
             hints=hints,
         )
 
@@ -89,13 +113,13 @@ class TrigValuesDrill(Drill):
         norm_submitted = submitted.strip()
         norm_answer = problem.answer.strip()
 
-        # Try numeric comparison first (handles both exact-symbolic and decimal answers,
-        # and lets a user type "0.71" even when the canonical answer is "sqrt(2)/2").
+        # Numeric comparison handles both exact-symbolic and decimal answers,
+        # and lets a user type "0.71" even when the canonical answer is "sqrt(2)/2".
         try:
-            submitted_val = float(sp.N(sp.sympify(norm_submitted)))
-            answer_val = float(sp.N(sp.sympify(norm_answer)))
+            submitted_val = float(sp.N(parse_user_expr(norm_submitted)))
+            answer_val = float(sp.N(parse_user_expr(norm_answer)))
             correct = abs(submitted_val - answer_val) <= self.EPSILON
-        except (sp.SympifyError, TypeError, ValueError):
+        except Exception:
             correct = False
 
         return CheckResult(

@@ -12,17 +12,29 @@ Working today:
 - **All 14 drills implemented** with generation + answer-checking tests
   (addition, subtraction, multiplication, division, squares, sqrts, cubes,
   cbrts, trig values, algebraic manipulation, derivatives, integrals,
-  RREF, ODE basics). 74 backend tests passing.
+  RREF, ODE basics). 54 backend tests passing.
 - **Mastery -> difficulty/hints algorithm is fully wired into the live
   API** (`GET /api/problems/next/{drill_id}`): problem difficulty, time
   limit, hint count, and hint delay all actually change based on how
   well you're doing, not a fixed value.
+- **Shuffle-bag question scheduling**: each drill/difficulty tier won't
+  repeat a problem until every problem in its pool has been shown once
+  (see `backend/app/engine/scheduler.py`).
+- **osu!-style hint scoring**: no hints = "300", one hint = "100", two
+  hints = "50" (combo keeps climbing through all of these); revealing the
+  final hint (which states the answer) breaks combo and counts as a miss.
+- **Implicit multiplication everywhere it matters**: prompts/answers show
+  "6x" not "6\*x", and "6x"/"6\*x" are accepted as identical answers
+  (`backend/app/drills/expr_utils.py`).
+- **LaTeX rendering** for derivatives/integrals (via KaTeX in the
+  frontend); **trig values in radians with pi notation** ("pi/2",
+  "3pi/4") instead of degrees.
 - **Warm-up mechanic**: 20-question calibration round that extends
   practice for anything you're weak on, exposed via
   `POST /api/sessions/warmup/*`.
 - **A playable UI** at `frontend/standalone/index.html` -- no build step,
-  osu!-styled, pick a drill and play, or run the full warm-up. See
-  `frontend/standalone/README.md` to run it.
+  osu!-styled, difficulty-ordered drill list, rectangular auto-sizing
+  prompt box. See `frontend/standalone/README.md` to run it.
 
 Not built yet: the polished React app in `frontend/src/` (the standalone
 HTML is a functional stand-in for now), persistent storage (everything's

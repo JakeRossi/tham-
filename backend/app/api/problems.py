@@ -22,13 +22,14 @@ from app.drills.base import Problem
 from app.drills.registry import get_drill
 from app.engine.difficulty import settings_for_mastery
 from app.engine.mastery import update_mastery
+from app.engine.scheduler import get_next_problem as get_next_scheduled_problem
 from app.engine.user_state import DEFAULT_USER, get_mastery, is_first_exposure, record_attempt
 
 router = APIRouter()
 
 
 @router.get("/next/{drill_id}")
-def next_problem(drill_id: str, user_id: str = DEFAULT_USER, rng_seed: int | None = None):
+def next_problem(drill_id: str, user_id: str = DEFAULT_USER):
     try:
         drill = get_drill(drill_id)
     except KeyError as e:
@@ -38,7 +39,9 @@ def next_problem(drill_id: str, user_id: str = DEFAULT_USER, rng_seed: int | Non
     first_exposure = is_first_exposure(drill_id, user_id)
     settings = settings_for_mastery(mastery, first_exposure)
 
-    problem = drill.generate(settings.problem_difficulty, rng_seed=rng_seed)
+    # Shuffle-bag scheduling: won't repeat a problem until every problem in
+    # the pool for this drill/difficulty tier has been shown once.
+    problem = get_next_scheduled_problem(drill, settings.problem_difficulty, user_id)
     visible_hints = problem.hints[: settings.max_hints]
 
     return {

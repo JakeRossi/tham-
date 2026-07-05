@@ -7,10 +7,12 @@ where the user's weak points are, without them having to think about it.
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 
 from app.drills.base import Drill
 from app.engine.mastery import is_weak_concept, update_mastery
+from app.engine.scheduler import get_next_problem
 
 INITIAL_ROUND_SIZE = 20
 EXTENSION_BATCH_SIZE = 5
@@ -39,7 +41,14 @@ class WarmupSession:
         self.drills = {d.id: d for d in drills}
         self.state = WarmupState()
         self._queue: list[str] = []
-        self._rng_seed = rng_seed
+        # Gives this session its own private shuffle-bag namespace (see
+        # engine/scheduler.py) so repeated problems from the same drill
+        # within one warm-up don't collide with the drill's regular
+        # practice-mode bags, and so each drill still cycles through
+        # unique problems rather than the old bug of reusing one fixed
+        # rng_seed for every draw (which generated the SAME problem
+        # every time).
+        self._scheduler_user_id = f"warmup-{uuid.uuid4()}"
         self._build_initial_queue()
 
     def _build_initial_queue(self) -> None:
@@ -59,7 +68,7 @@ class WarmupSession:
         drill_id = self._queue.pop(0)
         drill = self.drills[drill_id]
         current_mastery = self.state.concept_mastery.get(drill_id, 0.0)
-        return drill.generate(difficulty=max(0.1, current_mastery), rng_seed=self._rng_seed)
+        return get_next_problem(drill, max(0.1, current_mastery), self._scheduler_user_id)
 
     def record_attempt(
         self,

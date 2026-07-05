@@ -6,6 +6,8 @@
 <title>math-osu</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <style>
   :root {
     --bg: #12111a;
@@ -123,22 +125,29 @@
   .hud .stat .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
   .hud .combo .value { color: var(--gold); }
 
-  .hit-circle {
-    width: 220px; height: 220px; border-radius: 50%;
-    border: 5px solid var(--accent, var(--pink));
+  .hit-box {
+    max-width: min(720px, 82vw);
+    width: fit-content;
+    min-width: 220px;
+    min-height: 140px;
+    border-radius: 24px;
+    border: 3px solid var(--accent, var(--pink));
     display: flex; align-items: center; justify-content: center;
     margin: 0 auto 28px; position: relative;
     background: radial-gradient(circle, #201d2e 60%, transparent 100%);
     box-shadow: 0 0 40px -10px var(--accent, var(--pink));
+    padding: 20px 32px;
   }
-  .hit-circle .timer-ring {
-    position: absolute; inset: -5px;
-    border-radius: 50%;
-  }
-  .hit-circle .prompt {
-    font-size: 22px; font-weight: 500; padding: 0 20px; word-break: break-word;
+  .hit-box .prompt {
+    font-size: 22px; font-weight: 500;
     font-family: 'Space Grotesk', sans-serif;
+    white-space: normal;
+    overflow-wrap: break-word;
+    text-align: center;
+    max-width: 100%;
   }
+  /* KaTeX display blocks shouldn't add their own extra margin inside the box */
+  .hit-box .prompt .katex-display { margin: 0; }
 
   .answer-row { display: flex; gap: 10px; justify-content: center; margin-bottom: 18px; }
   .answer-input {
@@ -231,7 +240,7 @@
       </div>
     </div>
 
-    <div class="hit-circle" id="hitCircle">
+    <div class="hit-box" id="hitBox">
       <div class="prompt" id="promptText">Loading...</div>
     </div>
 
@@ -281,7 +290,54 @@ const CATEGORY_COLORS = {
   "differential-equations": "var(--cat-differential-equations)",
 };
 
+// Difficulty-ordered, not alphabetical -- matches the intended learning
+// progression rather than the JSON files' filename order.
+const DRILL_ORDER = [
+  "addition", "subtraction", "multiplication", "division",
+  "squares", "sqrts", "cubes", "cbrts",
+  "trig-values", "algebraic-manipulation",
+  "derivatives", "integrals", "ode-pde", "rref",
+];
+function byDifficultyOrder(a, b) {
+  const ia = DRILL_ORDER.indexOf(a.id);
+  const ib = DRILL_ORDER.indexOf(b.id);
+  if (ia === -1 && ib === -1) return 0;
+  if (ia === -1) return 1;
+  if (ib === -1) return -1;
+  return ia - ib;
+}
+
 const el = (id) => document.getElementById(id);
+
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Prompts/hints from derivatives & integrals come wrapped in $$...$$ LaTeX
+// (see backend app/drills/calculus.py); everything else is plain text.
+// This renders whichever segments are present via KaTeX, leaving plain
+// text untouched, rather than requiring every drill to opt into LaTeX.
+function renderMathOrText(container, text) {
+  if (!text.includes("$$") || !window.katex) {
+    container.textContent = text;
+    return;
+  }
+  const regex = /\$\$([\s\S]*?)\$\$/g;
+  let html = "";
+  let lastIndex = 0;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    html += escapeHtml(text.slice(lastIndex, match.index));
+    try {
+      html += katex.renderToString(match[1].trim(), { throwOnError: false, displayMode: true });
+    } catch (e) {
+      html += escapeHtml(match[0]);
+    }
+    lastIndex = regex.lastIndex;
+  }
+  html += escapeHtml(text.slice(lastIndex));
+  container.innerHTML = html;
+}
 const screens = { select: el("selectScreen"), game: el("gameScreen"), results: el("resultsScreen") };
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.add("hidden"));
@@ -310,7 +366,7 @@ async function loadMapGrid() {
     const data = await api("/api/maps/builtin");
     const grid = el("mapGrid");
     grid.innerHTML = "";
-    const implemented = data.maps.filter(m => m.implemented);
+    const implemented = data.maps.filter(m => m.implemented).sort(byDifficultyOrder);
     for (const m of implemented) {
       const color = CATEGORY_COLORS[m.category] || "var(--pink)";
       const card = document.createElement("div");
@@ -341,23 +397,44 @@ let currentProblem = null;
 let currentSettings = null;
 let warmupSessionId = null;
 
-let score = 0, combo = 0, maxCombo = 0, correctCount = 0, totalCount = 0;
+let score = 0, combo = 0, maxCombo = 0;
+// osu-style judgement counts, weighted for accuracy the same way osu!standard
+// does: accuracy = (300*count300 + 100*count100 + 50*count50) / (300*totalHits).
+// "Miss" covers both wrong answers AND correct-but-fully-hint-revealed answers
+// (revealing the final hint literally states the answer, so it's graded like
+// a miss even though the backend still marks it "correct").
+let count300 = 0, count100 = 0, count50 = 0, countMiss = 0;
 let hintsRevealed = 0, usedHintThisProblem = false;
 let questionStartTime = 0, hintTimeoutHandle = null, timerIntervalHandle = null;
 let timeLimit = 20;
 
 function resetSessionStats() {
-  score = 0; combo = 0; maxCombo = 0; correctCount = 0; totalCount = 0;
+  score = 0; combo = 0; maxCombo = 0;
+  count300 = 0; count100 = 0; count50 = 0; countMiss = 0;
   updateHud();
 }
+
+// hintsRevealed -> { tier value (like osu's 300/100/50), and whether this
+// counts as the answer having been fully given away (breaks combo).
+function judgementForHints(hintsRevealed) {
+  if (hintsRevealed <= 0) return { tier: 300, key: "count300", revealedAnswer: false };
+  if (hintsRevealed === 1) return { tier: 100, key: "count100", revealedAnswer: false };
+  if (hintsRevealed === 2) return { tier: 50, key: "count50", revealedAnswer: false };
+  return { tier: 0, key: "countMiss", revealedAnswer: true }; // 3rd hint IS the answer
+}
+
 function updateHud() {
   el("scoreVal").textContent = score;
   el("comboVal").textContent = `${combo}x`;
-  const acc = totalCount ? Math.round((correctCount / totalCount) * 100) : 100;
+  const totalJudged = count300 + count100 + count50 + countMiss;
+  const acc = totalJudged
+    ? Math.round(((300 * count300 + 100 * count100 + 50 * count50) / (300 * totalJudged)) * 100)
+    : 100;
   el("accuracyVal").textContent = `${acc}%`;
 }
 
 // ---------------- PRACTICE MODE ----------------
+
 
 async function startPractice(drillId, accent) {
   mode = "practice";
@@ -365,7 +442,7 @@ async function startPractice(drillId, accent) {
   currentAccent = accent;
   resetSessionStats();
   showScreen("game");
-  el("hitCircle").style.setProperty("--accent", accent);
+  el("hitBox").style.setProperty("--accent", accent);
   el("hintBtn").style.setProperty("--accent", accent);
   await loadNextPracticeProblem();
 }
@@ -386,7 +463,7 @@ async function loadNextPracticeProblem() {
     currentProblem = data;
     currentSettings = data;
     timeLimit = data.time_limit_seconds;
-    el("promptText").textContent = data.prompt;
+    renderMathOrText(el("promptText"), data.prompt);
     questionStartTime = Date.now();
 
     const hintBtn = el("hintBtn");
@@ -408,7 +485,7 @@ el("hintBtn").addEventListener("click", () => {
   box.classList.remove("hidden");
   const line = document.createElement("div");
   line.className = "hint-line";
-  line.textContent = hint;
+  renderMathOrText(line, hint);
   box.appendChild(line);
   if (hintsRevealed >= currentProblem.hints.length) el("hintBtn").disabled = true;
 });
@@ -434,19 +511,31 @@ async function submitPracticeAnswer() {
       }),
     });
 
-    totalCount += 1;
     const fb = el("feedbackText");
     if (result.correct) {
-      correctCount += 1;
-      combo += 1;
-      maxCombo = Math.max(maxCombo, combo);
-      const speedBonus = Math.max(0, 1 - timeTaken / timeLimit);
-      const hintPenalty = usedHintThisProblem ? 0.5 : 1;
-      const points = Math.round((100 + combo * 10) * (0.5 + speedBonus * 0.5) * hintPenalty);
-      score += points;
-      fb.textContent = `Correct! +${points}`;
-      fb.className = "feedback correct";
+      const judgement = judgementForHints(hintsRevealed);
+      if (judgement.revealedAnswer) {
+        // Revealing the final hint literally states the answer -- graded
+        // like a miss even though the backend confirms it's "correct":
+        // combo breaks, no points, accuracy takes the hit.
+        countMiss += 1;
+        combo = 0;
+        fb.textContent = "Answer revealed -- combo broken.";
+        fb.className = "feedback wrong";
+      } else {
+        if (judgement.key === "count300") count300 += 1;
+        else if (judgement.key === "count100") count100 += 1;
+        else if (judgement.key === "count50") count50 += 1;
+        combo += 1;
+        maxCombo = Math.max(maxCombo, combo);
+        const speedBonus = Math.max(0, 1 - timeTaken / timeLimit);
+        const points = Math.round(judgement.tier * (1 + combo * 0.02) * (0.7 + speedBonus * 0.3));
+        score += points;
+        fb.textContent = `${judgement.tier}! +${points}`;
+        fb.className = "feedback correct";
+      }
     } else {
+      countMiss += 1;
       combo = 0;
       fb.textContent = result.feedback || "Not quite.";
       fb.className = "feedback wrong";
@@ -472,7 +561,7 @@ async function startWarmup() {
   resetSessionStats();
   showScreen("game");
   currentAccent = "var(--pink)";
-  el("hitCircle").style.setProperty("--accent", currentAccent);
+  el("hitBox").style.setProperty("--accent", currentAccent);
   el("hintBtn").style.setProperty("--accent", currentAccent);
   setStatus("Starting warm-up...");
 
@@ -507,8 +596,8 @@ async function loadNextWarmupProblem() {
   currentProblem = data;
   // warm-up mixes drills from every category, so keep the ring neutral pink
   // rather than switching color every problem
-  el("hitCircle").style.setProperty("--accent", "var(--pink)");
-  el("promptText").textContent = data.prompt;
+  el("hitBox").style.setProperty("--accent", "var(--pink)");
+  renderMathOrText(el("promptText"), data.prompt);
   el("hintBtn").disabled = data.hints.length === 0;
   timeLimit = 20;
   questionStartTime = Date.now();
@@ -546,16 +635,27 @@ async function submitWarmupAnswer() {
     }),
   });
 
-  totalCount += 1;
   const fb = el("feedbackText");
   if (checkResult.correct) {
-    correctCount += 1;
-    combo += 1;
-    maxCombo = Math.max(maxCombo, combo);
-    score += 100 + combo * 10;
-    fb.textContent = "Correct!";
-    fb.className = "feedback correct";
+    const judgement = judgementForHints(hintsRevealed);
+    if (judgement.revealedAnswer) {
+      countMiss += 1;
+      combo = 0;
+      fb.textContent = "Answer revealed -- combo broken.";
+      fb.className = "feedback wrong";
+    } else {
+      if (judgement.key === "count300") count300 += 1;
+      else if (judgement.key === "count100") count100 += 1;
+      else if (judgement.key === "count50") count50 += 1;
+      combo += 1;
+      maxCombo = Math.max(maxCombo, combo);
+      const points = Math.round(judgement.tier * (1 + combo * 0.02));
+      score += points;
+      fb.textContent = `${judgement.tier}! +${points}`;
+      fb.className = "feedback correct";
+    }
   } else {
+    countMiss += 1;
     combo = 0;
     fb.textContent = checkResult.feedback || "Not quite.";
     fb.className = "feedback wrong";
@@ -597,7 +697,10 @@ el("endBtn").addEventListener("click", () => {
 
 function showResultsCommon() {
   showScreen("results");
-  const acc = totalCount ? Math.round((correctCount / totalCount) * 100) : 0;
+  const totalJudged = count300 + count100 + count50 + countMiss;
+  const acc = totalJudged
+    ? Math.round(((300 * count300 + 100 * count100 + 50 * count50) / (300 * totalJudged)) * 100)
+    : 0;
   el("finalScore").textContent = score;
   el("finalAccuracy").textContent = `${acc}%`;
   el("finalCombo").textContent = `${maxCombo}x`;
