@@ -63,6 +63,23 @@
   .user-tag { color: var(--text-dim); font-size: 13px; }
 
   /* ---------- select screen ---------- */
+  .checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+  }
+  .checkbox-card {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg-raised); border: 1px solid #2c2940; border-radius: 12px;
+    padding: 12px 14px; cursor: pointer;
+  }
+  .checkbox-card input { width: 18px; height: 18px; accent-color: var(--accent, var(--pink)); }
+  .checkbox-card .cat-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--accent, var(--pink));
+    flex-shrink: 0;
+  }
+  .checkbox-card .name { font-size: 14px; }
+
   .warmup-banner {
     background: linear-gradient(135deg, var(--pink) 0%, #a238ff 100%);
     border-radius: 18px;
@@ -157,6 +174,20 @@
   }
   .answer-input:focus { outline: none; border-color: var(--accent, var(--pink)); }
 
+  .work-area-wrap { max-width: 480px; margin: 0 auto 18px; text-align: left; }
+  .work-area-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-dim); margin-bottom: 6px;
+  }
+  .work-area {
+    width: 100%; min-height: 90px; resize: vertical;
+    background: var(--bg-raised); border: 1px solid #2c2940; border-radius: 12px;
+    color: var(--text); font-size: 14px; padding: 12px 14px;
+    font-family: 'Space Grotesk', monospace;
+    box-sizing: border-box;
+  }
+  .work-area:focus { outline: none; border-color: var(--accent, var(--pink)); }
+
   .btn {
     background: var(--accent, var(--pink)); color: #12111a; border: none;
     border-radius: 12px; padding: 14px 24px; font-size: 16px; font-weight: 700;
@@ -217,10 +248,27 @@
   <div id="selectScreen">
     <div class="warmup-banner" id="warmupBanner">
       <h2>Warm Up</h2>
-      <p>20 questions across every drill -- anything you're weak on gets extra reps automatically.</p>
+      <p>20 questions across the drills you pick -- anything you're weak on gets extra reps automatically.</p>
     </div>
     <div class="section-label">Drills</div>
     <div class="map-grid" id="mapGrid"></div>
+  </div>
+
+  <!-- WARM-UP SETUP SCREEN -->
+  <div id="warmupSetupScreen" class="hidden">
+    <h2 style="margin-bottom: 6px;">Warm Up -- choose your drills</h2>
+    <p style="color: var(--text-dim); font-size: 14px; margin: 0 0 18px;">
+      Only checked drills will show up during warm-up. Don't want ODE/PDE or RREF yet? Uncheck them.
+    </p>
+    <div class="bottom-actions" style="justify-content: flex-start; margin-bottom: 14px;">
+      <button class="btn secondary" id="selectAllBtn">Select all</button>
+      <button class="btn secondary" id="selectNoneBtn">Select none</button>
+    </div>
+    <div class="checkbox-grid" id="warmupCheckboxGrid"></div>
+    <div class="bottom-actions" style="margin-top: 24px;">
+      <button class="btn" id="startWarmupBtn">Start warm-up</button>
+      <button class="btn secondary" id="cancelWarmupSetupBtn">Cancel</button>
+    </div>
   </div>
 
   <!-- GAME SCREEN -->
@@ -238,6 +286,10 @@
         <div class="value" id="accuracyVal">100%</div>
         <div class="label">Accuracy</div>
       </div>
+      <div class="stat">
+        <div class="value" id="questionCountVal">0</div>
+        <div class="label">Questions</div>
+      </div>
     </div>
 
     <div class="hit-box" id="hitBox">
@@ -247,6 +299,11 @@
     <div class="answer-row">
       <input class="answer-input" id="answerInput" type="text" placeholder="your answer" autocomplete="off" />
       <button class="btn" id="submitBtn">Submit</button>
+    </div>
+
+    <div class="work-area-wrap">
+      <div class="work-area-label">Workspace (not graded -- jot down your work here)</div>
+      <textarea class="work-area" id="workArea" placeholder="Work it out here..." spellcheck="false"></textarea>
     </div>
 
     <div class="feedback" id="feedbackText"></div>
@@ -338,7 +395,12 @@ function renderMathOrText(container, text) {
   html += escapeHtml(text.slice(lastIndex));
   container.innerHTML = html;
 }
-const screens = { select: el("selectScreen"), game: el("gameScreen"), results: el("resultsScreen") };
+const screens = {
+  select: el("selectScreen"),
+  warmupSetup: el("warmupSetupScreen"),
+  game: el("gameScreen"),
+  results: el("resultsScreen"),
+};
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.add("hidden"));
   screens[name].classList.remove("hidden");
@@ -360,6 +422,9 @@ async function api(path, options = {}) {
 
 // ---------------- SELECT SCREEN ----------------
 
+let cachedImplementedDrills = [];   // populated by loadMapGrid, reused by the warm-up setup screen
+let warmupSelectedIds = new Set();   // which drills are checked in the setup screen
+
 async function loadMapGrid() {
   setStatus("Loading drills from backend...");
   try {
@@ -367,6 +432,8 @@ async function loadMapGrid() {
     const grid = el("mapGrid");
     grid.innerHTML = "";
     const implemented = data.maps.filter(m => m.implemented).sort(byDifficultyOrder);
+    cachedImplementedDrills = implemented;
+    warmupSelectedIds = new Set(implemented.map(m => m.id)); // default: everything selected
     for (const m of implemented) {
       const color = CATEGORY_COLORS[m.category] || "var(--pink)";
       const card = document.createElement("div");
@@ -386,7 +453,47 @@ async function loadMapGrid() {
   }
 }
 
-el("warmupBanner").addEventListener("click", startWarmup);
+el("warmupBanner").addEventListener("click", openWarmupSetup);
+
+function openWarmupSetup() {
+  const grid = el("warmupCheckboxGrid");
+  grid.innerHTML = "";
+  for (const m of cachedImplementedDrills) {
+    const color = CATEGORY_COLORS[m.category] || "var(--pink)";
+    const label = document.createElement("label");
+    label.className = "checkbox-card";
+    label.style.setProperty("--accent", color);
+    const checked = warmupSelectedIds.has(m.id) ? "checked" : "";
+    label.innerHTML = `
+      <input type="checkbox" data-drill-id="${m.id}" ${checked} />
+      <span class="cat-dot"></span>
+      <span class="name">${m.name}</span>
+    `;
+    label.querySelector("input").addEventListener("change", (e) => {
+      if (e.target.checked) warmupSelectedIds.add(m.id);
+      else warmupSelectedIds.delete(m.id);
+    });
+    grid.appendChild(label);
+  }
+  showScreen("warmupSetup");
+}
+
+el("selectAllBtn").addEventListener("click", () => {
+  warmupSelectedIds = new Set(cachedImplementedDrills.map(m => m.id));
+  openWarmupSetup();
+});
+el("selectNoneBtn").addEventListener("click", () => {
+  warmupSelectedIds = new Set();
+  openWarmupSetup();
+});
+el("cancelWarmupSetupBtn").addEventListener("click", () => showScreen("select"));
+el("startWarmupBtn").addEventListener("click", () => {
+  if (warmupSelectedIds.size === 0) {
+    setStatus("Pick at least one drill for warm-up.");
+    return;
+  }
+  startWarmup(Array.from(warmupSelectedIds));
+});
 
 // ---------------- SHARED GAME STATE ----------------
 
@@ -431,6 +538,7 @@ function updateHud() {
     ? Math.round(((300 * count300 + 100 * count100 + 50 * count50) / (300 * totalJudged)) * 100)
     : 100;
   el("accuracyVal").textContent = `${acc}%`;
+  el("questionCountVal").textContent = totalJudged;
 }
 
 // ---------------- PRACTICE MODE ----------------
@@ -454,6 +562,7 @@ async function loadNextPracticeProblem() {
   el("hintBox").classList.add("hidden");
   el("hintBox").innerHTML = "";
   el("answerInput").value = "";
+  el("workArea").value = "";
   el("answerInput").focus();
   hintsRevealed = 0;
   usedHintThisProblem = false;
@@ -556,7 +665,7 @@ el("answerInput").addEventListener("keydown", (e) => { if (e.key === "Enter") su
 
 // ---------------- WARM-UP MODE ----------------
 
-async function startWarmup() {
+async function startWarmup(drillIds) {
   mode = "warmup";
   resetSessionStats();
   showScreen("game");
@@ -568,7 +677,7 @@ async function startWarmup() {
   try {
     const data = await api("/api/sessions/warmup/start", {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify({ drill_ids: drillIds || null }),
     });
     warmupSessionId = data.session_id;
     setStatus("");
@@ -584,6 +693,7 @@ async function loadNextWarmupProblem() {
   el("hintBox").classList.add("hidden");
   el("hintBox").innerHTML = "";
   el("answerInput").value = "";
+  el("workArea").value = "";
   el("answerInput").focus();
   hintsRevealed = 0;
   usedHintThisProblem = false;
@@ -715,7 +825,7 @@ function showResultsCommon() {
 
 el("playAgainBtn").addEventListener("click", () => {
   if (mode === "practice") startPractice(currentDrillId, currentAccent);
-  else startWarmup();
+  else startWarmup(Array.from(warmupSelectedIds));
 });
 el("backToSelectBtn").addEventListener("click", () => {
   showScreen("select");

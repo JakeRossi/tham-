@@ -40,17 +40,19 @@ class RREFDrill(Drill):
                 break
 
         answer_str = str(rref_matrix.tolist())
+        matrix_latex = sp.latex(matrix, mat_str="bmatrix", mat_delim="")
+        rref_latex = sp.latex(rref_matrix, mat_str="bmatrix", mat_delim="")
 
         hints = [
             "Use row operations to get a leading 1 in the first row, first column.",
             "Use that leading 1 to eliminate all other entries in its column, "
             "then move to the next row/column and repeat.",
-            f"The RREF is {answer_str}.",
+            f"The RREF is $$ {rref_latex} $$",
         ]
 
         return Problem(
             drill_id=self.id,
-            prompt=f"Find the RREF of: {rows}",
+            prompt=f"Find the RREF of: $$ {matrix_latex} $$",
             answer=answer_str,
             difficulty=difficulty,
             seed={"rows": rows},

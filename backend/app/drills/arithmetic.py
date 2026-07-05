@@ -223,13 +223,15 @@ class DivisionDrill(Drill):
 
 
 class SquaresDrill(Drill):
-    """0.0 -> bases 1-10, 1.0 -> bases up to 999."""
+    """0.0 -> bases 1-10, 1.0 -> bases up to ~50 (matches the same pacing
+    as cubes/sqrts/cbrts -- this used to scale up to base 999, which made
+    the warm-up jump to squaring 2-3 digit numbers almost immediately)."""
 
     id = "squares"
 
     def generate(self, difficulty: float, rng_seed: int | None = None) -> Problem:
         rng = random.Random(rng_seed)
-        max_base = 10 + int(difficulty * 989)  # 10 at 0.0, ~999 at 1.0
+        max_base = 10 + int(difficulty * 40)  # 10 at 0.0, 50 at 1.0
         n = rng.randint(1, max_base)
         answer = n * n
 
@@ -241,7 +243,7 @@ class SquaresDrill(Drill):
 
         return Problem(
             drill_id=self.id,
-            prompt=f"{n}^2 = ?",
+            prompt=f"$${n}^2$$",
             answer=str(answer),
             difficulty=difficulty,
             seed={"n": n, "op": "square"},
@@ -298,7 +300,7 @@ class SqrtsDrill(Drill):
 
         return Problem(
             drill_id=self.id,
-            prompt=f"sqrt({radicand}) = ?",
+            prompt=f"$$\\sqrt{{{radicand}}}$$",
             answer=answer,
             difficulty=difficulty,
             seed={"radicand": radicand, "op": "sqrt"},
@@ -339,7 +341,7 @@ class CubesDrill(Drill):
 
         return Problem(
             drill_id=self.id,
-            prompt=f"{n}^3 = ?",
+            prompt=f"$${n}^3$$",
             answer=str(answer),
             difficulty=difficulty,
             seed={"n": n, "op": "cube"},
@@ -396,7 +398,7 @@ class CbrtsDrill(Drill):
 
         return Problem(
             drill_id=self.id,
-            prompt=f"cbrt({radicand}) = ?",
+            prompt=f"$$\\sqrt[3]{{{radicand}}}$$",
             answer=answer,
             difficulty=difficulty,
             seed={"radicand": radicand, "op": "cbrt"},
