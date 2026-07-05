@@ -1,0 +1,9 @@
+{
+  "id": "squares",
+  "name": "Squares",
+  "category": "arithmetic",
+  "description": "Squares drill.",
+  "difficulty_notes": "0.0 = 1-10, 1.0 = up to 3-digit base",
+  "implemented": false,
+  "prerequisites": []
+}

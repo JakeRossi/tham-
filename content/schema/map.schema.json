@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Map",
+  "description": "A shareable drillset identity -- either a builtin drill or a parsed textbook. See docs/MAP_HASHING.md for how map_hash is computed for uploaded textbooks.",
+  "type": "object",
+  "required": ["map_hash", "title", "drills"],
+  "properties": {
+    "map_hash": {
+      "type": "string",
+      "description": "Stable identity hash. For builtin drills this can just be the drill id; for textbooks it's a hash of the parsed, structured problem set."
+    },
+    "title": {
+      "type": "string"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": ["builtin", "textbook"]
+    },
+    "edition_info": {
+      "type": "object",
+      "description": "Only present for source_type: textbook",
+      "properties": {
+        "isbn": { "type": "string" },
+        "author": { "type": "string" },
+        "edition": { "type": "string" }
+      }
+    },
+    "drills": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of drill ids included in this map"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "integrals",
+  "name": "Integrals",
+  "category": "calculus",
+  "description": "Integrals drill.",
+  "difficulty_notes": "0.0 = basic definite integrals of polynomials, 1.0 = line integrals",
+  "implemented": false,
+  "prerequisites": [
+    "derivatives"
+  ]
+}

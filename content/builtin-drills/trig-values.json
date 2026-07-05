@@ -1,0 +1,9 @@
+{
+  "id": "trig-values",
+  "name": "Trig Values",
+  "category": "trigonometry",
+  "description": "Trig Values drill.",
+  "difficulty_notes": "0.0 = common angles (0,30,45,60,90), 1.0 = arbitrary angles, all six functions",
+  "implemented": false,
+  "prerequisites": []
+}

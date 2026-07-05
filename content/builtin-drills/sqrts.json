@@ -1,0 +1,11 @@
+{
+  "id": "sqrts",
+  "name": "Square Roots",
+  "category": "arithmetic",
+  "description": "Square Roots drill.",
+  "difficulty_notes": "0.0 = perfect squares 1-100, 1.0 = irrational, decimal-rounded",
+  "implemented": false,
+  "prerequisites": [
+    "squares"
+  ]
+}

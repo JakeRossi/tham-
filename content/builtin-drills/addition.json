@@ -1,0 +1,9 @@
+{
+  "id": "addition",
+  "name": "Addition",
+  "category": "arithmetic",
+  "description": "Addition drill.",
+  "difficulty_notes": "0.0 = single digit, 1.0 = 4-digit + 4-digit",
+  "implemented": true,
+  "prerequisites": []
+}

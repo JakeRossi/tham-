@@ -1,0 +1,11 @@
+{
+  "id": "subtraction",
+  "name": "Subtraction",
+  "category": "arithmetic",
+  "description": "Subtraction drill.",
+  "difficulty_notes": "0.0 = single digit non-negative result, 1.0 = 4-digit",
+  "implemented": true,
+  "prerequisites": [
+    "addition"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "cbrts",
+  "name": "Cube Roots",
+  "category": "arithmetic",
+  "description": "Cube Roots drill.",
+  "difficulty_notes": "0.0 = perfect cubes, 1.0 = irrational, decimal-rounded",
+  "implemented": false,
+  "prerequisites": [
+    "cubes"
+  ]
+}

@@ -1,0 +1,18 @@
+[project]
+name = "math-osu-backend"
+version = "0.1.0"
+description = "Backend for math-osu: adaptive math/physics drilling with osu!-style gameplay"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sympy>=1.13",
+    "pydantic>=2.8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

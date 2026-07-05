@@ -1,0 +1,35 @@
+name: content-validate
+
+on:
+  pull_request:
+    paths:
+      - "content/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install jsonschema
+        run: pip install jsonschema
+      - name: Validate builtin drill configs
+        run: |
+          python3 - << 'EOF'
+          import json, glob, sys
+          from jsonschema import validate, ValidationError
+
+          schema = json.load(open("content/schema/drill.schema.json"))
+          failed = False
+          for path in glob.glob("content/builtin-drills/*.json"):
+              data = json.load(open(path))
+              try:
+                  validate(instance=data, schema=schema)
+                  print(f"OK   {path}")
+              except ValidationError as e:
+                  print(f"FAIL {path}: {e.message}")
+                  failed = True
+          sys.exit(1 if failed else 0)
+          EOF

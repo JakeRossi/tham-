@@ -1,0 +1,11 @@
+{
+  "id": "derivatives",
+  "name": "Derivatives",
+  "category": "calculus",
+  "description": "Derivatives drill.",
+  "difficulty_notes": "0.0-0.5 = single-variable polynomials, 0.5-1.0 = partial derivatives",
+  "implemented": true,
+  "prerequisites": [
+    "algebraic-manipulation"
+  ]
+}

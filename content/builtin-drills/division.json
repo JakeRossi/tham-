@@ -1,0 +1,11 @@
+{
+  "id": "division",
+  "name": "Division",
+  "category": "arithmetic",
+  "description": "Division drill.",
+  "difficulty_notes": "0.0 = exact single-digit quotient, 1.0 = multi-digit w/ remainder",
+  "implemented": false,
+  "prerequisites": [
+    "multiplication"
+  ]
+}
