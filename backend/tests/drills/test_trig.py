@@ -16,11 +16,12 @@ def test_common_angles_are_correct_and_exact_form_accepted():
         assert drill.check(problem, problem.answer).correct
 
 
-def test_prompt_uses_pi_notation_not_degrees():
+def test_prompt_uses_latex_pi_notation_not_degrees():
     drill = TrigValuesDrill()
     problem = drill.generate(0.2, rng_seed=1)
-    assert "pi" in problem.prompt or problem.prompt.startswith(f"{problem.seed['func']}(0)")
+    assert "$$" in problem.prompt  # LaTeX-wrapped for KaTeX rendering
     assert "deg" not in problem.prompt.lower()
+    assert "pi" in problem.prompt or problem.seed["frac_num"] == 0
 
 
 def test_format_pi_angle():

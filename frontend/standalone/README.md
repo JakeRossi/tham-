@@ -46,17 +46,29 @@ to run the 20-question calibration round across every drill.
   accuracy, even if you then type the right answer.
 - **Math notation**: derivatives, integrals, squares, sqrts, cubes, cbrts,
   and RREF all render as real LaTeX (via KaTeX) -- exponents, radicals,
-  and whole matrices, not ASCII text; algebra/derivative/integral/ODE
+  and whole matrices, not ASCII text; trig shows an actual pi symbol
+  (rendered via LaTeX), not the word "pi"; algebra/derivative/integral/ODE
   answers accept "6x" and "6\*x" interchangeably; trig values are in
-  radians using pi notation ("pi/2", "3pi/4") rather than degrees.
+  radians rather than degrees.
 - **Warm-up drill selection**: clicking "Warm Up" opens a checklist of
   every implemented drill (checked by default) so you can exclude
   anything you don't want mixed in yet (e.g. skip RREF/ODE until you've
   covered the basics).
-- **Workspace**: a scratch textarea under the answer box for working out
-  harder problems -- not graded, not sent anywhere, just for you.
+- **Whiteboard**: a small always-visible drawing canvas under the answer
+  box for scratch work (not graded), plus a "Fullscreen" button that pins
+  the current question in the corner, gives you the whole screen to draw
+  on, and keeps the answer box reachable in a floating bar at the bottom.
+- **Fill-in-the-blank matrix input for RREF**: instead of typing a raw
+  list, you get an actual bracketed grid of number boxes matching the
+  matrix's dimensions -- blank cells default to 0.
 - **Question count**: the HUD shows how many questions you've answered
   this session, alongside score/combo/accuracy.
+- **PP + player profile**: every answer earns pp (osu!-inspired: reward
+  for accuracy tier, combo, how far along the difficulty progression the
+  drill is, and lifetime volume). Click "View profile" in the header for
+  lifetime pp, play count, accuracy, max combo, questions this month, and
+  a per-drill breakdown -- persists across backend restarts (unlike
+  mastery/session state, which is in-memory only).
 - S/A/B/C/D rank at the end based on that weighted accuracy.
 
 ## Known limitations (intentional, for a fast first playable build)

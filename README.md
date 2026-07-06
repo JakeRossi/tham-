@@ -12,7 +12,7 @@ Working today:
 - **All 14 drills implemented** with generation + answer-checking tests
   (addition, subtraction, multiplication, division, squares, sqrts, cubes,
   cbrts, trig values, algebraic manipulation, derivatives, integrals,
-  RREF, ODE basics). 54 backend tests passing.
+  RREF, ODE basics). 75 backend tests passing.
 - **Mastery -> difficulty/hints algorithm is fully wired into the live
   API** (`GET /api/problems/next/{drill_id}`): problem difficulty, time
   limit, hint count, and hint delay all actually change based on how
@@ -23,23 +23,32 @@ Working today:
 - **osu!-style hint scoring**: no hints = "300", one hint = "100", two
   hints = "50" (combo keeps climbing through all of these); revealing the
   final hint (which states the answer) breaks combo and counts as a miss.
+- **PP (performance points) + persistent player profile**: an
+  osu!-inspired pp formula (accuracy tier x combo x drill difficulty x
+  lifetime volume, see `backend/app/engine/pp.py`) feeds a file-backed
+  profile (`backend/app/engine/profile_store.py`) tracking lifetime pp,
+  play count, accuracy, max combo, monthly activity, and per-drill stats
+  -- survives backend restarts, unlike the in-memory mastery/scheduler state.
 - **Implicit multiplication everywhere it matters**: prompts/answers show
   "6x" not "6\*x", and "6x"/"6\*x" are accepted as identical answers
   (`backend/app/drills/expr_utils.py`).
-- **LaTeX rendering** for derivatives/integrals (via KaTeX in the
-  frontend); **trig values in radians with pi notation** ("pi/2",
-  "3pi/4") instead of degrees.
-- **Warm-up mechanic**: 20-question calibration round that extends
-  practice for anything you're weak on, exposed via
-  `POST /api/sessions/warmup/*`.
+- **LaTeX rendering** for derivatives, integrals, squares/roots, RREF
+  matrices, and trig (with an actual pi symbol, not the word "pi") via
+  KaTeX in the frontend; trig values are in radians, not degrees.
+- **Warm-up mechanic** with drill selection: 20-question calibration round
+  that extends practice for anything you're weak on, and you choose which
+  drills are in scope before starting.
 - **A playable UI** at `frontend/standalone/index.html` -- no build step,
   osu!-styled, difficulty-ordered drill list, rectangular auto-sizing
-  prompt box. See `frontend/standalone/README.md` to run it.
+  prompt box, a whiteboard canvas (with fullscreen mode) for scratch work,
+  and a fill-in-the-blank matrix input for RREF. See
+  `frontend/standalone/README.md` to run it.
 
 Not built yet: the polished React app in `frontend/src/` (the standalone
-HTML is a functional stand-in for now), persistent storage (everything's
-in-memory and resets on backend restart), textbook upload/parsing, and
-real leaderboards (endpoint exists, but stores nothing durable yet).
+HTML is a functional stand-in for now), a real database (profile storage
+is a single JSON file, fine for one local player), textbook
+upload/parsing, and real leaderboards (endpoint exists, but stores
+nothing durable yet).
 
 ## Repo layout
 

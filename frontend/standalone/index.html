@@ -61,6 +61,49 @@
   }
   .logo span { color: var(--pink); }
   .user-tag { color: var(--text-dim); font-size: 13px; }
+  .profile-link {
+    padding: 8px 16px; font-size: 13px; font-weight: 500;
+  }
+
+  /* ---------- profile screen ---------- */
+  .profile-screen { }
+  .profile-header {
+    display: flex; align-items: center; gap: 20px; margin-bottom: 28px;
+    background: var(--bg-raised); border-radius: 18px; padding: 22px 26px;
+  }
+  .profile-avatar {
+    width: 64px; height: 64px; border-radius: 16px;
+    background: linear-gradient(135deg, var(--pink), #a238ff);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-weight: 900; font-family: 'Space Grotesk', sans-serif;
+    flex-shrink: 0;
+  }
+  .profile-title { font-size: 20px; font-weight: 700; }
+  .profile-subtitle { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+  .profile-pp { margin-left: auto; text-align: right; }
+  .profile-pp .value { font-size: 32px; font-weight: 900; color: var(--gold); font-family: 'Space Grotesk', sans-serif; }
+  .profile-pp .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); }
+
+  .profile-stat-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px; margin-bottom: 28px;
+  }
+  .profile-stat-card {
+    background: var(--bg-raised); border: 1px solid #2c2940; border-radius: 14px;
+    padding: 16px;
+  }
+  .profile-stat-card .value { font-size: 24px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
+  .profile-stat-card .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+
+  .profile-drill-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .profile-drill-row {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--bg-raised); border-radius: 10px; padding: 10px 14px; font-size: 13px;
+  }
+  .profile-drill-row .name { width: 160px; }
+  .profile-drill-row .bar { flex: 1; height: 6px; background: #2c2940; border-radius: 3px; overflow: hidden; }
+  .profile-drill-row .bar-fill { height: 100%; }
+  .profile-drill-row .plays { width: 70px; text-align: right; color: var(--text-dim); }
 
   /* ---------- select screen ---------- */
   .checkbox-grid {
@@ -174,19 +217,70 @@
   }
   .answer-input:focus { outline: none; border-color: var(--accent, var(--pink)); }
 
-  .work-area-wrap { max-width: 480px; margin: 0 auto 18px; text-align: left; }
+  .matrix-answer-wrap { text-align: center; margin-bottom: 18px; }
+  .matrix-bracket-row {
+    display: inline-flex; align-items: stretch; gap: 0;
+  }
+  .matrix-bracket {
+    width: 10px; border: 3px solid var(--accent, var(--pink));
+  }
+  .matrix-bracket.left { border-right: none; border-radius: 6px 0 0 6px; }
+  .matrix-bracket.right { border-left: none; border-radius: 0 6px 6px 0; }
+  .matrix-cells {
+    display: grid; gap: 8px; padding: 14px 10px;
+  }
+  .matrix-cells input {
+    width: 56px; height: 44px; text-align: center;
+    background: var(--bg-raised); border: 1px solid #2c2940; border-radius: 8px;
+    color: var(--text); font-size: 16px; font-family: 'Space Grotesk', monospace;
+  }
+  .matrix-cells input:focus { outline: none; border-color: var(--accent, var(--pink)); }
+
+  .work-area-wrap { max-width: 560px; margin: 0 auto 18px; text-align: left; }
+  .work-area-label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
   .work-area-label {
     font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
-    color: var(--text-dim); margin-bottom: 6px;
+    color: var(--text-dim);
   }
-  .work-area {
-    width: 100%; min-height: 90px; resize: vertical;
-    background: var(--bg-raised); border: 1px solid #2c2940; border-radius: 12px;
-    color: var(--text); font-size: 14px; padding: 12px 14px;
-    font-family: 'Space Grotesk', monospace;
-    box-sizing: border-box;
+  .work-area-tools { display: flex; gap: 6px; }
+  .btn-tiny {
+    background: var(--bg-raised); color: var(--text-dim); border: 1px solid #2c2940;
+    border-radius: 8px; padding: 4px 10px; font-size: 11px; cursor: pointer;
+    font-family: 'Space Grotesk', sans-serif;
   }
-  .work-area:focus { outline: none; border-color: var(--accent, var(--pink)); }
+  .btn-tiny:hover { color: var(--text); border-color: var(--accent, var(--pink)); }
+  .work-canvas {
+    width: 100%; height: 150px; display: block;
+    background: #0d0c14; border: 1px solid #2c2940; border-radius: 12px;
+    cursor: crosshair; touch-action: none;
+  }
+
+  /* ---------- fullscreen whiteboard overlay ---------- */
+  .whiteboard-overlay {
+    position: fixed; inset: 0; z-index: 2000;
+    background: #0d0c14;
+    display: flex; flex-direction: column;
+  }
+  .whiteboard-pinned-prompt {
+    position: absolute; top: 18px; left: 18px; z-index: 2010;
+    background: var(--bg-raised); border: 1px solid #2c2940; border-radius: 14px;
+    padding: 12px 18px; max-width: 40vw; font-size: 15px;
+    box-shadow: 0 8px 24px -8px rgba(0,0,0,0.6);
+  }
+  #fullscreenCanvas {
+    width: 100%; height: 100%; flex: 1; cursor: crosshair; touch-action: none; display: block;
+  }
+  .whiteboard-toolbar {
+    position: absolute; top: 18px; right: 18px; z-index: 2010;
+    display: flex; gap: 10px;
+  }
+  .whiteboard-answer-slot {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+    z-index: 2010; background: var(--bg-raised); border: 1px solid #2c2940;
+    border-radius: 18px; padding: 16px 20px;
+    box-shadow: 0 8px 30px -8px rgba(0,0,0,0.7);
+  }
+  .whiteboard-answer-slot #answerAreaContainer { margin: 0; }
 
   .btn {
     background: var(--accent, var(--pink)); color: #12111a; border: none;
@@ -241,7 +335,11 @@
 <div class="app">
   <div class="header">
     <div class="logo">math<span>-osu</span></div>
-    <div class="user-tag" id="userTag">local player</div>
+    <div class="header-right" id="headerRight">
+      <button class="btn secondary profile-link" id="profileLinkBtn">
+        <span id="headerPp">0pp</span> &middot; View profile
+      </button>
+    </div>
   </div>
 
   <!-- SELECT SCREEN -->
@@ -296,14 +394,28 @@
       <div class="prompt" id="promptText">Loading...</div>
     </div>
 
-    <div class="answer-row">
-      <input class="answer-input" id="answerInput" type="text" placeholder="your answer" autocomplete="off" />
-      <button class="btn" id="submitBtn">Submit</button>
+    <div id="answerAreaContainer">
+      <div class="answer-row" id="answerRow">
+        <input class="answer-input" id="answerInput" type="text" placeholder="your answer" autocomplete="off" />
+        <button class="btn" id="submitBtn">Submit</button>
+      </div>
+
+      <div class="matrix-answer-wrap hidden" id="matrixAnswerWrap">
+        <div class="matrix-bracket-row" id="matrixGrid"></div>
+        <button class="btn" id="matrixSubmitBtn" style="margin-top: 14px;">Submit</button>
+      </div>
     </div>
+    <div id="answerAreaAnchor"></div>
 
     <div class="work-area-wrap">
-      <div class="work-area-label">Workspace (not graded -- jot down your work here)</div>
-      <textarea class="work-area" id="workArea" placeholder="Work it out here..." spellcheck="false"></textarea>
+      <div class="work-area-label-row">
+        <div class="work-area-label">Whiteboard (not graded -- work it out here)</div>
+        <div class="work-area-tools">
+          <button class="btn-tiny" id="wbClearInlineBtn">Clear</button>
+          <button class="btn-tiny" id="wbFullscreenBtn">Fullscreen</button>
+        </div>
+      </div>
+      <canvas class="work-canvas" id="workCanvas"></canvas>
     </div>
 
     <div class="feedback" id="feedbackText"></div>
@@ -331,7 +443,56 @@
     </div>
   </div>
 
+  <!-- PROFILE SCREEN -->
+  <div id="profileScreen" class="profile-screen hidden">
+    <div class="profile-header">
+      <div class="profile-avatar" id="profileAvatarInitial">L</div>
+      <div>
+        <div class="profile-title">local player</div>
+        <div class="profile-subtitle" id="profileJoined">Joined --</div>
+        <div class="profile-subtitle" id="profileLastPlayed"></div>
+      </div>
+      <div class="profile-pp">
+        <div class="value" id="profileTotalPp">0</div>
+        <div class="label">Total pp</div>
+      </div>
+    </div>
+
+    <div class="profile-stat-grid">
+      <div class="profile-stat-card"><div class="value" id="profilePlayCount">0</div><div class="label">Play count</div></div>
+      <div class="profile-stat-card"><div class="value" id="profileAccuracy">100%</div><div class="label">Lifetime accuracy</div></div>
+      <div class="profile-stat-card"><div class="value" id="profileMaxCombo">0x</div><div class="label">Max combo</div></div>
+      <div class="profile-stat-card"><div class="value" id="profileThisMonth">0</div><div class="label">Questions this month</div></div>
+    </div>
+
+    <div class="section-label">Judgement breakdown</div>
+    <div class="profile-stat-grid" style="margin-bottom: 28px;">
+      <div class="profile-stat-card"><div class="value" id="profileTier300">0</div><div class="label">300 (no hints)</div></div>
+      <div class="profile-stat-card"><div class="value" id="profileTier100">0</div><div class="label">100 (1 hint)</div></div>
+      <div class="profile-stat-card"><div class="value" id="profileTier50">0</div><div class="label">50 (2 hints)</div></div>
+      <div class="profile-stat-card"><div class="value" id="profileTierMiss">0</div><div class="label">Misses</div></div>
+    </div>
+
+    <div class="section-label">Per-drill activity</div>
+    <div class="profile-drill-list" id="profileDrillList"></div>
+
+    <div class="bottom-actions">
+      <button class="btn secondary" id="profileBackBtn">Back</button>
+    </div>
+  </div>
+
   <div class="status-msg" id="statusMsg"></div>
+</div>
+
+<!-- FULLSCREEN WHITEBOARD OVERLAY -->
+<div id="whiteboardOverlay" class="whiteboard-overlay hidden">
+  <div class="whiteboard-pinned-prompt" id="whiteboardPinnedPrompt"></div>
+  <canvas id="fullscreenCanvas"></canvas>
+  <div class="whiteboard-toolbar">
+    <button class="btn secondary" id="wbClearFullBtn">Clear</button>
+    <button class="btn" id="wbExitBtn">Exit fullscreen</button>
+  </div>
+  <div class="whiteboard-answer-slot" id="whiteboardAnswerSlot"></div>
 </div>
 
 <script>
@@ -400,6 +561,7 @@ const screens = {
   warmupSetup: el("warmupSetupScreen"),
   game: el("gameScreen"),
   results: el("resultsScreen"),
+  profile: el("profileScreen"),
 };
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.add("hidden"));
@@ -541,6 +703,69 @@ function updateHud() {
   el("questionCountVal").textContent = totalJudged;
 }
 
+// ---------------- ANSWER UI: text box vs. fill-in-the-blank matrix ----------------
+
+function setupAnswerUI(problem) {
+  const isMatrix = problem.drill_id === "rref" && problem.seed && problem.seed.rows;
+  el("answerRow").classList.toggle("hidden", isMatrix);
+  el("matrixAnswerWrap").classList.toggle("hidden", !isMatrix);
+  if (isMatrix) buildMatrixGrid(problem.seed.rows);
+}
+
+function buildMatrixGrid(rows) {
+  const numRows = rows.length;
+  const numCols = rows[0].length;
+  const cellsDiv = document.createElement("div");
+  cellsDiv.className = "matrix-cells";
+  cellsDiv.style.gridTemplateColumns = `repeat(${numCols}, auto)`;
+  cellsDiv.id = "matrixCells";
+  for (let r = 0; r < numRows; r++) {
+    for (let c = 0; c < numCols; c++) {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = "0";
+      input.dataset.row = r;
+      input.dataset.col = c;
+      input.autocomplete = "off";
+      cellsDiv.appendChild(input);
+    }
+  }
+  const grid = el("matrixGrid");
+  grid.innerHTML = "";
+  const leftBracket = document.createElement("div");
+  leftBracket.className = "matrix-bracket left";
+  const rightBracket = document.createElement("div");
+  rightBracket.className = "matrix-bracket right";
+  grid.appendChild(leftBracket);
+  grid.appendChild(cellsDiv);
+  grid.appendChild(rightBracket);
+}
+
+function getMatrixAnswerString() {
+  const cellsDiv = el("matrixCells");
+  if (!cellsDiv) return "[]";
+  const inputs = Array.from(cellsDiv.querySelectorAll("input"));
+  const numRows = Math.max(...inputs.map(i => parseInt(i.dataset.row))) + 1;
+  const numCols = Math.max(...inputs.map(i => parseInt(i.dataset.col))) + 1;
+  const rows = Array.from({ length: numRows }, () => Array(numCols).fill("0"));
+  for (const input of inputs) {
+    const r = parseInt(input.dataset.row);
+    const c = parseInt(input.dataset.col);
+    const val = input.value.trim();
+    rows[r][c] = val === "" ? "0" : val;
+  }
+  return "[" + rows.map(row => "[" + row.join(",") + "]").join(",") + "]";
+}
+
+function getCurrentSubmittedAnswer() {
+  if (currentProblem && currentProblem.drill_id === "rref") {
+    return getMatrixAnswerString();
+  }
+  return el("answerInput").value.trim();
+}
+
+el("matrixSubmitBtn").addEventListener("click", submitCurrentAnswer);
+
 // ---------------- PRACTICE MODE ----------------
 
 
@@ -562,7 +787,7 @@ async function loadNextPracticeProblem() {
   el("hintBox").classList.add("hidden");
   el("hintBox").innerHTML = "";
   el("answerInput").value = "";
-  el("workArea").value = "";
+  clearInlineCanvas();
   el("answerInput").focus();
   hintsRevealed = 0;
   usedHintThisProblem = false;
@@ -573,6 +798,8 @@ async function loadNextPracticeProblem() {
     currentSettings = data;
     timeLimit = data.time_limit_seconds;
     renderMathOrText(el("promptText"), data.prompt);
+    setupAnswerUI(data);
+    updateWhiteboardPinnedPrompt();
     questionStartTime = Date.now();
 
     const hintBtn = el("hintBtn");
@@ -600,7 +827,7 @@ el("hintBtn").addEventListener("click", () => {
 });
 
 async function submitPracticeAnswer() {
-  const submitted = el("answerInput").value.trim();
+  const submitted = getCurrentSubmittedAnswer();
   if (!submitted || !currentProblem) return;
   clearTimers();
   const timeTaken = (Date.now() - questionStartTime) / 1000;
@@ -621,6 +848,10 @@ async function submitPracticeAnswer() {
     });
 
     const fb = el("feedbackText");
+    let judgementCombo = combo;
+    let judgementCorrectForPp = result.correct;
+    let hintsRevealedForPp = hintsRevealed;
+
     if (result.correct) {
       const judgement = judgementForHints(hintsRevealed);
       if (judgement.revealedAnswer) {
@@ -649,10 +880,34 @@ async function submitPracticeAnswer() {
       fb.textContent = result.feedback || "Not quite.";
       fb.className = "feedback wrong";
     }
+    judgementCombo = combo;
     updateHud();
+
+    // Report pp AFTER combo is resolved above (combo_after depends on the
+    // judgement we just computed from this same result).
+    recordPp(currentProblem.drill_id, judgementCorrectForPp, hintsRevealedForPp, judgementCombo);
+
     setTimeout(loadNextPracticeProblem, 900);
   } catch (e) {
     setStatus(`Error submitting answer: ${e.message}`);
+  }
+}
+
+async function recordPp(drillId, correct, hintsRevealedCount, comboAfter) {
+  try {
+    const ppResult = await api("/api/problems/record-pp", {
+      method: "POST",
+      body: JSON.stringify({
+        drill_id: drillId,
+        correct,
+        hints_revealed: hintsRevealedCount,
+        combo_after: comboAfter,
+        user_id: USER_ID,
+      }),
+    });
+    el("headerPp").textContent = `${Math.round(ppResult.total_pp)}pp`;
+  } catch (e) {
+    // pp tracking is secondary -- don't interrupt gameplay if this fails
   }
 }
 
@@ -693,7 +948,7 @@ async function loadNextWarmupProblem() {
   el("hintBox").classList.add("hidden");
   el("hintBox").innerHTML = "";
   el("answerInput").value = "";
-  el("workArea").value = "";
+  clearInlineCanvas();
   el("answerInput").focus();
   hintsRevealed = 0;
   usedHintThisProblem = false;
@@ -708,13 +963,15 @@ async function loadNextWarmupProblem() {
   // rather than switching color every problem
   el("hitBox").style.setProperty("--accent", "var(--pink)");
   renderMathOrText(el("promptText"), data.prompt);
+  setupAnswerUI(data);
+  updateWhiteboardPinnedPrompt();
   el("hintBtn").disabled = data.hints.length === 0;
   timeLimit = 20;
   questionStartTime = Date.now();
 }
 
 async function submitWarmupAnswer() {
-  const submitted = el("answerInput").value.trim();
+  const submitted = getCurrentSubmittedAnswer();
   if (!submitted || !currentProblem) return;
   clearTimers();
   const timeTaken = (Date.now() - questionStartTime) / 1000;
@@ -771,6 +1028,7 @@ async function submitWarmupAnswer() {
     fb.className = "feedback wrong";
   }
   updateHud();
+  recordPp(currentProblem.drill_id, checkResult.correct, hintsRevealed, combo);
   setTimeout(loadNextWarmupProblem, 700);
 }
 
@@ -837,9 +1095,180 @@ function clearTimers() {
   if (timerIntervalHandle) clearInterval(timerIntervalHandle);
 }
 
+// ---------------- WHITEBOARD ----------------
+// A small always-visible canvas for quick scratch work, plus a fullscreen
+// mode (toggle button) that pins the current question in the corner and
+// gives you the whole screen to draw on, with the answer box still
+// reachable in a floating bar at the bottom -- similar in spirit to
+// dailyintegral.org's whiteboard.
+
+function makeDrawable(canvas) {
+  const ctx = canvas.getContext("2d");
+  let drawing = false;
+  let lastX = 0, lastY = 0;
+
+  function resizeToDisplaySize() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const priorDrawing = document.createElement("canvas");
+    priorDrawing.width = canvas.width;
+    priorDrawing.height = canvas.height;
+    priorDrawing.getContext("2d").drawImage(canvas, 0, 0);
+
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "#ff5da2";
+    // best-effort: keep prior strokes when resizing (e.g. entering fullscreen)
+    if (priorDrawing.width > 0 && priorDrawing.height > 0) {
+      ctx.drawImage(priorDrawing, 0, 0, priorDrawing.width, priorDrawing.height, 0, 0, rect.width, rect.height);
+    }
+  }
+
+  function pos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const point = e.touches ? e.touches[0] : e;
+    return { x: point.clientX - rect.left, y: point.clientY - rect.top };
+  }
+
+  function start(e) {
+    drawing = true;
+    const p = pos(e);
+    lastX = p.x; lastY = p.y;
+  }
+  function move(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    const p = pos(e);
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    lastX = p.x; lastY = p.y;
+  }
+  function end() { drawing = false; }
+
+  canvas.addEventListener("pointerdown", start);
+  canvas.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", end);
+  canvas.addEventListener("touchstart", start, { passive: false });
+  canvas.addEventListener("touchmove", move, { passive: false });
+  window.addEventListener("touchend", end);
+
+  resizeToDisplaySize();
+  window.addEventListener("resize", resizeToDisplaySize);
+
+  return {
+    clear: () => ctx.clearRect(0, 0, canvas.width, canvas.height),
+    resize: resizeToDisplaySize,
+  };
+}
+
+const inlineWhiteboard = makeDrawable(el("workCanvas"));
+const fullscreenWhiteboard = makeDrawable(el("fullscreenCanvas"));
+
+function clearInlineCanvas() { inlineWhiteboard.clear(); }
+
+el("wbClearInlineBtn").addEventListener("click", () => inlineWhiteboard.clear());
+el("wbClearFullBtn").addEventListener("click", () => fullscreenWhiteboard.clear());
+
+function updateWhiteboardPinnedPrompt() {
+  if (currentProblem) {
+    renderMathOrText(el("whiteboardPinnedPrompt"), currentProblem.prompt);
+  }
+}
+
+el("wbFullscreenBtn").addEventListener("click", () => {
+  updateWhiteboardPinnedPrompt();
+  el("whiteboardOverlay").classList.remove("hidden");
+  // Move the live answer box (text input or matrix grid, whichever is
+  // active) into the overlay so you can submit without leaving fullscreen.
+  el("whiteboardAnswerSlot").appendChild(el("answerAreaContainer"));
+  fullscreenWhiteboard.resize();
+  el("answerInput").focus();
+});
+
+el("wbExitBtn").addEventListener("click", () => {
+  el("whiteboardOverlay").classList.add("hidden");
+  // Move the answer box back to its normal spot in the game screen.
+  el("answerAreaAnchor").parentNode.insertBefore(
+    el("answerAreaContainer"), el("answerAreaAnchor").nextSibling
+  );
+});
+
+// ---------------- PROFILE SCREEN ----------------
+
+async function refreshHeaderPp() {
+  try {
+    const profile = await api(`/api/profile/${USER_ID}`);
+    el("headerPp").textContent = `${Math.round(profile.total_pp)}pp`;
+  } catch (e) {
+    // non-fatal -- header pp is a nice-to-have, don't block the rest of the UI on it
+  }
+}
+
+async function openProfileScreen() {
+  showScreen("profile");
+  setStatus("Loading profile...");
+  try {
+    const profile = await api(`/api/profile/${USER_ID}`);
+    setStatus("");
+
+    el("profileTotalPp").textContent = Math.round(profile.total_pp);
+    el("profilePlayCount").textContent = profile.play_count;
+    el("profileAccuracy").textContent = `${profile.lifetime_accuracy}%`;
+    el("profileMaxCombo").textContent = `${profile.max_combo_lifetime}x`;
+    el("profileThisMonth").textContent = profile.questions_this_month;
+
+    const joined = new Date(profile.joined_at);
+    el("profileJoined").textContent = `Joined ${joined.toLocaleDateString()}`;
+    el("profileLastPlayed").textContent = profile.last_played_at
+      ? `Last played ${new Date(profile.last_played_at).toLocaleString()}`
+      : "Never played yet";
+
+    el("profileTier300").textContent = profile.tier_counts["300"];
+    el("profileTier100").textContent = profile.tier_counts["100"];
+    el("profileTier50").textContent = profile.tier_counts["50"];
+    el("profileTierMiss").textContent = profile.tier_counts["miss"];
+
+    const drillList = el("profileDrillList");
+    drillList.innerHTML = "";
+    const drillIds = Object.keys(profile.per_drill_stats).sort(
+      (a, b) => DRILL_ORDER.indexOf(a) - DRILL_ORDER.indexOf(b)
+    );
+    if (drillIds.length === 0) {
+      drillList.innerHTML = `<div style="color: var(--text-dim); font-size: 13px;">No drills played yet -- go pick one!</div>`;
+    }
+    for (const drillId of drillIds) {
+      const stats = profile.per_drill_stats[drillId];
+      const pct = Math.round(stats.best_mastery * 100);
+      const row = document.createElement("div");
+      row.className = "profile-drill-row";
+      row.innerHTML = `
+        <div class="name">${drillId}</div>
+        <div class="bar"><div class="bar-fill" style="width:${pct}%; background:${pct < 40 ? '#ff5d5d' : pct < 70 ? '#ffd166' : '#5dff9d'}"></div></div>
+        <div class="plays">${stats.play_count} plays</div>
+      `;
+      drillList.appendChild(row);
+    }
+  } catch (e) {
+    setStatus(`Could not load profile: ${e.message}`);
+  }
+}
+
+el("profileLinkBtn").addEventListener("click", openProfileScreen);
+el("profileBackBtn").addEventListener("click", () => {
+  showScreen("select");
+  loadMapGrid();
+});
+
 // ---------------- INIT ----------------
 showScreen("select");
 loadMapGrid();
+refreshHeaderPp();
 </script>
 </body>
 </html>

@@ -64,6 +64,7 @@ def next_warmup_problem(session_id: str):
         "prompt": problem.prompt,
         "answer": problem.answer,
         "hints": problem.hints,
+        "seed": problem.seed,
     }
 
 

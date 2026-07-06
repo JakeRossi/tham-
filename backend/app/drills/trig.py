@@ -30,13 +30,29 @@ ALL_FUNCS = {**BASIC_FUNCS, "csc": lambda t: 1 / sp.sin(t), "sec": lambda t: 1 /
 
 
 def format_pi_angle(num: int, den: int) -> str:
-    """(1, 2) -> 'pi/2', (3, 4) -> '3pi/4', (0, 1) -> '0', (1, 1) -> 'pi'."""
+    """(1, 2) -> 'pi/2', (3, 4) -> '3pi/4', (0, 1) -> '0', (1, 1) -> 'pi'.
+    Plain-text form, kept for internal/hint use where LaTeX isn't rendered."""
     if num == 0:
         return "0"
     sign = "-" if num < 0 else ""
     num = abs(num)
     pi_part = "pi" if num == 1 else f"{num}pi"
     return f"{sign}{pi_part}" if den == 1 else f"{sign}{pi_part}/{den}"
+
+
+def format_pi_angle_latex(num: int, den: int) -> str:
+    """(1, 2) -> '\\frac{\\pi}{2}', (3, 4) -> '\\frac{3\\pi}{4}', (0,1) -> '0',
+    (1, 1) -> '\\pi'. Used for the LaTeX-rendered prompt/hints so the actual
+    pi glyph shows up instead of the word 'pi'."""
+    if num == 0:
+        return "0"
+    sign = "-" if num < 0 else ""
+    num = abs(num)
+    pi_part = "\\pi" if num == 1 else f"{num}\\pi"
+    return f"{sign}{pi_part}" if den == 1 else f"{sign}\\frac{{{pi_part}}}{{{den}}}"
+
+
+LATEX_FUNC_NAMES = {"sin": "\\sin", "cos": "\\cos", "tan": "\\tan", "csc": "\\csc", "sec": "\\sec", "cot": "\\cot"}
 
 
 class TrigValuesDrill(Drill):
@@ -88,6 +104,8 @@ class TrigValuesDrill(Drill):
             exact_val = self._safe_eval(func, theta)
 
         angle_str = format_pi_angle(num, den)
+        angle_latex = format_pi_angle_latex(num, den)
+        func_latex = LATEX_FUNC_NAMES[func_name]
 
         if difficulty < 0.5:
             answer = sp.sstr(exact_val)  # exact symbolic form, e.g. "sqrt(3)/2"
@@ -95,14 +113,14 @@ class TrigValuesDrill(Drill):
             answer = f"{float(exact_val):.2f}"
 
         hints = [
-            f"Recall the unit circle position for {angle_str} radians.",
-            f"{func_name}({angle_str}) relates to a reference angle within the first quadrant.",
+            f"Recall the unit circle position for $$ {angle_latex} $$ radians.",
+            f"$$ {func_latex}\\left( {angle_latex} \\right) $$ relates to a reference angle within the first quadrant.",
             f"The answer is {answer}.",
         ]
 
         return Problem(
             drill_id=self.id,
-            prompt=f"{func_name}({angle_str}) = ?",
+            prompt=f"$$ {func_latex}\\left( {angle_latex} \\right) $$",
             answer=answer,
             difficulty=difficulty,
             seed={"frac_num": num, "frac_den": den, "func": func_name},
