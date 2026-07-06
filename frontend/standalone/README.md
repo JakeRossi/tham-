@@ -54,21 +54,27 @@ to run the 20-question calibration round across every drill.
   every implemented drill (checked by default) so you can exclude
   anything you don't want mixed in yet (e.g. skip RREF/ODE until you've
   covered the basics).
-- **Whiteboard**: a small always-visible drawing canvas under the answer
-  box for scratch work (not graded), plus a "Fullscreen" button that pins
-  the current question in the corner, gives you the whole screen to draw
-  on, and keeps the answer box reachable in a floating bar at the bottom.
+- **Whiteboard**: a larger always-visible drawing canvas under the answer
+  box for scratch work (not graded), with color swatches, Ctrl+Z undo,
+  and a "Fullscreen" button that pins the current question in the
+  corner, gives you the whole screen to draw on, and keeps the answer box
+  reachable in a floating bar at the bottom. Fullscreen and inline share
+  the same drawing (a single offscreen canvas both views render from), so
+  nothing is lost switching between them.
 - **Fill-in-the-blank matrix input for RREF**: instead of typing a raw
   list, you get an actual bracketed grid of number boxes matching the
   matrix's dimensions -- blank cells default to 0.
 - **Question count**: the HUD shows how many questions you've answered
   this session, alongside score/combo/accuracy.
-- **PP + player profile**: every answer earns pp (osu!-inspired: reward
-  for accuracy tier, combo, how far along the difficulty progression the
-  drill is, and lifetime volume). Click "View profile" in the header for
-  lifetime pp, play count, accuracy, max combo, questions this month, and
-  a per-drill breakdown -- persists across backend restarts (unlike
-  mastery/session state, which is in-memory only).
+- **PP + player profile, following osu!'s actual mechanics**: pp is
+  awarded once per finished session on a drill (not per question) --
+  300/100/50/miss are accuracy judgements that feed into that one score,
+  the same way osu! computes a beatmap play's pp from aim/speed/accuracy.
+  Only your best-ever session per drill counts towards total pp, combined
+  with osu's real weightage decay (2nd-best score counts 95% as much, 3rd
+  90.25%, and so on) plus its documented bonus for breadth of drills
+  played. Click "View profile" in the header for lifetime pp, play count,
+  accuracy, max combo, questions this month, and a per-drill breakdown.
 - S/A/B/C/D rank at the end based on that weighted accuracy.
 
 ## Known limitations (intentional, for a fast first playable build)

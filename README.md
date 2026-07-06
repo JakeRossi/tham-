@@ -23,12 +23,17 @@ Working today:
 - **osu!-style hint scoring**: no hints = "300", one hint = "100", two
   hints = "50" (combo keeps climbing through all of these); revealing the
   final hint (which states the answer) breaks combo and counts as a miss.
-- **PP (performance points) + persistent player profile**: an
-  osu!-inspired pp formula (accuracy tier x combo x drill difficulty x
-  lifetime volume, see `backend/app/engine/pp.py`) feeds a file-backed
-  profile (`backend/app/engine/profile_store.py`) tracking lifetime pp,
-  play count, accuracy, max combo, monthly activity, and per-drill stats
-  -- survives backend restarts, unlike the in-memory mastery/scheduler state.
+- **PP (performance points) + persistent player profile, matching osu!'s
+  actual mechanics**: pp is awarded per finished SESSION on a drill (like
+  finishing one osu! beatmap play), not per question. 300/100/50/miss are
+  accuracy judgements that feed into that one session score, not currency
+  themselves. Only your best-ever session per drill counts, combined via
+  osu's real weightage decay (0.95^n) plus its documented bonus-pp
+  formula for breadth of drills played. See `backend/app/engine/pp.py`
+  for the full mapping from osu's mechanics to this app's equivalents.
+  Persisted in a file-backed profile (`backend/app/engine/profile_store.py`)
+  tracking lifetime pp, play count, accuracy, max combo, monthly
+  activity, and per-drill best scores -- survives backend restarts.
 - **Implicit multiplication everywhere it matters**: prompts/answers show
   "6x" not "6\*x", and "6x"/"6\*x" are accepted as identical answers
   (`backend/app/drills/expr_utils.py`).
