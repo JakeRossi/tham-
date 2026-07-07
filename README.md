@@ -23,17 +23,28 @@ Working today:
 - **osu!-style hint scoring**: no hints = "300", one hint = "100", two
   hints = "50" (combo keeps climbing through all of these); revealing the
   final hint (which states the answer) breaks combo and counts as a miss.
-- **PP (performance points) + persistent player profile, matching osu!'s
-  actual mechanics**: pp is awarded per finished SESSION on a drill (like
-  finishing one osu! beatmap play), not per question. 300/100/50/miss are
-  accuracy judgements that feed into that one session score, not currency
-  themselves. Only your best-ever session per drill counts, combined via
-  osu's real weightage decay (0.95^n) plus its documented bonus-pp
-  formula for breadth of drills played. See `backend/app/engine/pp.py`
-  for the full mapping from osu's mechanics to this app's equivalents.
-  Persisted in a file-backed profile (`backend/app/engine/profile_store.py`)
-  tracking lifetime pp, play count, accuracy, max combo, monthly
-  activity, and per-drill best scores -- survives backend restarts.
+- **PP (performance points), v3**: awarded per QUESTION, not per session --
+  each drill category has a hard, permanent ceiling on pp-per-question
+  (2pp for basic arithmetic, up to 10pp for ODE/PDE), and how close you
+  get to that ceiling on any given question depends on how many CORRECT
+  reps you've ever done on that specific drill, via a slow logarithmic
+  leveling curve (first ~10 reps worth 1pp each, next ~20 worth 2pp each,
+  next ~30 worth 3pp each, and so on -- see `backend/app/engine/pp.py`).
+  Hint tiers still scale pp down (a "100" earns 60%, a "50" earns 30%, a
+  miss earns 0%). total_pp is a plain running sum -- no session weightage,
+  no best-score-per-drill, matching a much slower, more realistic
+  accumulation curve than the earlier two attempts at this system.
+- **Player profile with real graphs**: a pp-over-time trend chart and a
+  monthly play-history chart (both hand-rolled SVG, no charting library),
+  plus a best-performance list and a most-played-drills list -- loosely
+  modeled on an osu! profile page. Correctly distinguishes **play count**
+  (how many times you've opened a drill -- osu!'s real "Play Count"
+  metric) from **questions answered** (how many individual questions
+  you've attempted, a much larger number) -- these used to be conflated.
+- **LaTeX-aware math input**: the answer box is a real math editor
+  (MathQuill) -- type `/` for a fraction with editable numerator/
+  denominator, `sqrt` or `nthroot` for a root symbol, `^` for an
+  exponent slot, same idea as Desmos or dailyintegral.org's input.
 - **Implicit multiplication everywhere it matters**: prompts/answers show
   "6x" not "6\*x", and "6x"/"6\*x" are accepted as identical answers
   (`backend/app/drills/expr_utils.py`).

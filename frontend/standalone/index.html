@@ -8,6 +8,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Rubik:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mathquill@0.10.1/build/mathquill.css">
+<script src="https://cdn.jsdelivr.net/npm/mathquill@0.10.1/build/mathquill.js"></script>
 <style>
   :root {
     --bg: #12111a;
@@ -104,6 +107,34 @@
   .profile-drill-row .bar { flex: 1; height: 6px; background: #2c2940; border-radius: 3px; overflow: hidden; }
   .profile-drill-row .bar-fill { height: 100%; }
   .profile-drill-row .plays { width: 70px; text-align: right; color: var(--text-dim); }
+
+  .pp-trend-wrap {
+    background: var(--bg-raised); border: 1px solid #2c2940; border-radius: 14px;
+    padding: 16px 18px 8px; margin-bottom: 20px;
+  }
+  .pp-trend-svg { width: 100%; height: 90px; display: block; }
+
+  .play-history-wrap {
+    background: var(--bg-raised); border: 1px solid #2c2940; border-radius: 14px;
+    padding: 16px 18px 8px; margin-bottom: 24px;
+  }
+  .monthly-chart-svg { width: 100%; height: auto; display: block; }
+  .monthly-chart-svg text { font-family: 'Space Grotesk', sans-serif; }
+
+  .profile-best-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; }
+  .profile-best-row {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--bg-raised); border-radius: 12px; padding: 12px 16px; font-size: 13px;
+  }
+  .profile-best-row .rank-badge {
+    width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 13px; flex-shrink: 0; font-family: 'Space Grotesk', sans-serif;
+  }
+  .profile-best-row .info { flex: 1; min-width: 0; }
+  .profile-best-row .drill-name { font-weight: 500; }
+  .profile-best-row .meta { color: var(--text-dim); font-size: 11px; margin-top: 2px; }
+  .profile-best-row .pp-value { color: var(--gold); font-weight: 700; font-size: 15px; white-space: nowrap; }
+  .profile-empty-note { color: var(--text-dim); font-size: 13px; padding: 8px 2px; }
 
   /* ---------- select screen ---------- */
   .checkbox-grid {
@@ -209,13 +240,33 @@
   /* KaTeX display blocks shouldn't add their own extra margin inside the box */
   .hit-box .prompt .katex-display { margin: 0; }
 
-  .answer-row { display: flex; gap: 10px; justify-content: center; margin-bottom: 18px; }
+  .answer-row { display: flex; gap: 10px; justify-content: center; align-items: center; margin-bottom: 6px; }
   .answer-input {
     background: var(--bg-raised); border: 2px solid #2c2940; border-radius: 12px;
-    color: var(--text); font-size: 20px; padding: 14px 18px; width: 260px;
-    text-align: center; font-family: 'Space Grotesk', sans-serif;
+    padding: 10px 18px; min-width: 200px; display: inline-block;
   }
-  .answer-input:focus { outline: none; border-color: var(--accent, var(--pink)); }
+  .math-input-hint {
+    text-align: center; font-size: 11px; color: var(--text-dim); margin-bottom: 16px;
+  }
+  .math-input-hint code {
+    background: var(--bg-raised); border: 1px solid #2c2940; border-radius: 4px;
+    padding: 1px 5px; color: var(--text);
+  }
+
+  /* MathQuill dark-theme overrides -- it ships assuming a light page by
+     default, so re-theme its generated elements to match the neon look. */
+  .mq-editable-field {
+    border: none !important; box-shadow: none !important;
+    font-size: 20px !important; color: var(--text) !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+  }
+  .mq-editable-field.mq-focused { box-shadow: none !important; }
+  .mq-root-block { color: var(--text) !important; }
+  .mq-editable-field .mq-fraction, .mq-editable-field .mq-fraction * { color: var(--text) !important; }
+  .mq-editable-field .mq-numerator, .mq-editable-field .mq-denominator { border-color: var(--text) !important; }
+  .mq-editable-field .mq-sqrt-stem, .mq-editable-field .mq-sqrt-prefix { border-color: var(--text) !important; color: var(--text) !important; }
+  .mq-editable-field .mq-cursor { border-color: var(--pink) !important; }
+  .answer-input:focus-within { border-color: var(--accent, var(--pink)) !important; }
 
   .matrix-answer-wrap { text-align: center; margin-bottom: 18px; }
   .matrix-bracket-row {
@@ -405,9 +456,10 @@
 
     <div id="answerAreaContainer">
       <div class="answer-row" id="answerRow">
-        <input class="answer-input" id="answerInput" type="text" placeholder="your answer" autocomplete="off" />
+        <span class="answer-input" id="answerInput"></span>
         <button class="btn" id="submitBtn">Submit</button>
       </div>
+      <div class="math-input-hint">Type <code>/</code> for a fraction, <code>sqrt</code> or <code>nthroot</code> for a root</div>
 
       <div class="matrix-answer-wrap hidden" id="matrixAnswerWrap">
         <div class="matrix-bracket-row" id="matrixGrid"></div>
@@ -470,11 +522,16 @@
       </div>
     </div>
 
+    <div class="pp-trend-wrap">
+      <div id="ppTrendChart"></div>
+    </div>
+
     <div class="profile-stat-grid">
-      <div class="profile-stat-card"><div class="value" id="profilePlayCount">0</div><div class="label">Play count</div></div>
-      <div class="profile-stat-card"><div class="value" id="profileAccuracy">100%</div><div class="label">Lifetime accuracy</div></div>
-      <div class="profile-stat-card"><div class="value" id="profileMaxCombo">0x</div><div class="label">Max combo</div></div>
-      <div class="profile-stat-card"><div class="value" id="profileThisMonth">0</div><div class="label">Questions this month</div></div>
+      <div class="profile-stat-card"><div class="value" id="profilePlayCount">0</div><div class="label">Play Count</div></div>
+      <div class="profile-stat-card"><div class="value" id="profileQuestionsAnswered">0</div><div class="label">Questions Answered</div></div>
+      <div class="profile-stat-card"><div class="value" id="profileAccuracy">100%</div><div class="label">Accuracy</div></div>
+      <div class="profile-stat-card"><div class="value" id="profileMaxCombo">0x</div><div class="label">Max Combo</div></div>
+      <div class="profile-stat-card"><div class="value" id="profileThisMonth">0</div><div class="label">Plays This Month</div></div>
     </div>
 
     <div class="section-label">Judgement breakdown</div>
@@ -485,7 +542,15 @@
       <div class="profile-stat-card"><div class="value" id="profileTierMiss">0</div><div class="label">Misses</div></div>
     </div>
 
-    <div class="section-label">Per-drill activity</div>
+    <div class="section-label">Best Performance</div>
+    <div class="profile-best-list" id="profileBestList"></div>
+
+    <div class="section-label">Play History</div>
+    <div class="play-history-wrap">
+      <div id="playHistoryChart"></div>
+    </div>
+
+    <div class="section-label">Most Played Drills</div>
     <div class="profile-drill-list" id="profileDrillList"></div>
 
     <div class="bottom-actions">
@@ -687,6 +752,7 @@ let score = 0, combo = 0, maxCombo = 0;
 // a miss even though the backend still marks it "correct").
 let count300 = 0, count100 = 0, count50 = 0, countMiss = 0;
 let lastKnownMastery = 0;   // updated from /submit's new_mastery, used when finalizing a session's pp
+let sessionPpEarned = 0;    // running sum of pp earned THIS session (per-question awards), for the results screen and session logging
 let warmupPerDrill = {};    // drillId -> { tierCounts: {300,100,50,miss}, combo, maxCombo, mastery } --
                             // warm-up mixes multiple drills in one session, so pp (a per-drill/per-"map"
                             // concept, see backend/app/engine/pp.py) needs its own tally per drill,
@@ -779,7 +845,10 @@ function getCurrentSubmittedAnswer() {
   if (currentProblem && currentProblem.drill_id === "rref") {
     return getMatrixAnswerString();
   }
-  return el("answerInput").value.trim();
+  if (window.answerMathField) {
+    return latexToPlainExpr(answerMathField.latex()).trim();
+  }
+  return ""; // MathQuill failed to load -- see initAnswerMathField()
 }
 
 el("matrixSubmitBtn").addEventListener("click", submitCurrentAnswer);
@@ -792,11 +861,24 @@ async function startPractice(drillId, accent) {
   currentDrillId = drillId;
   currentAccent = accent;
   resetSessionStats();
+  sessionPpEarned = 0;
   showScreen("game");
   el("hitBox").style.setProperty("--accent", accent);
   el("hintBtn").style.setProperty("--accent", accent);
   inlineWhiteboardView.sizeToDisplay();  // now visible -- fix up the backing store size
+  recordSessionStart(drillId);  // the REAL play-count metric -- once per drill opened, not per question
   await loadNextPracticeProblem();
+}
+
+async function recordSessionStart(drillId) {
+  try {
+    await api("/api/profile/session-started", {
+      method: "POST",
+      body: JSON.stringify({ drill_id: drillId, user_id: USER_ID }),
+    });
+  } catch (e) {
+    // non-fatal -- play-count tracking shouldn't block gameplay
+  }
 }
 
 async function loadNextPracticeProblem() {
@@ -805,9 +887,9 @@ async function loadNextPracticeProblem() {
   el("feedbackText").textContent = "";
   el("hintBox").classList.add("hidden");
   el("hintBox").innerHTML = "";
-  el("answerInput").value = "";
+if (window.answerMathField) answerMathField.latex("");
   clearInlineCanvas();
-  el("answerInput").focus();
+if (window.answerMathField) answerMathField.focus();
   hintsRevealed = 0;
   usedHintThisProblem = false;
 
@@ -868,6 +950,7 @@ async function submitPracticeAnswer() {
 
     const fb = el("feedbackText");
     lastKnownMastery = result.new_mastery;
+    let revealedAnswerThisQuestion = false;
     if (result.correct) {
       const judgement = judgementForHints(hintsRevealed);
       if (judgement.revealedAnswer) {
@@ -876,6 +959,7 @@ async function submitPracticeAnswer() {
         // combo breaks, no points, accuracy takes the hit.
         countMiss += 1;
         combo = 0;
+        revealedAnswerThisQuestion = true;
         fb.textContent = "Answer revealed -- combo broken.";
         fb.className = "feedback wrong";
       } else {
@@ -897,35 +981,57 @@ async function submitPracticeAnswer() {
       fb.className = "feedback wrong";
     }
     updateHud();
+    recordQuestionPp(currentProblem.drill_id, hintsRevealed, result.correct, revealedAnswerThisQuestion);
     setTimeout(loadNextPracticeProblem, 900);
   } catch (e) {
     setStatus(`Error submitting answer: ${e.message}`);
   }
 }
 
-// pp is recorded once per finished SESSION (see finalizeSession below),
-// not per question -- matching how osu! awards pp per completed beatmap
-// play, not per individual note. 300/100/50/miss below are ACCURACY
-// judgements that feed into that one session-level pp calculation, not
-// pp amounts themselves.
-async function finalizeSession(drillId, tierCounts, comboForDrill, masteryAfter) {
+// pp is awarded per QUESTION (see backend/app/engine/pp.py) -- hard-capped
+// per drill category and slow to level up, so this stays modest. Session
+// end (finalizeSession below) only LOGS the session for the profile
+// screen's history; it doesn't award any additional pp.
+async function recordQuestionPp(drillId, hintsRevealedCount, correct, revealedAnswer) {
+  try {
+    const result = await api("/api/profile/record-question", {
+      method: "POST",
+      body: JSON.stringify({
+        drill_id: drillId,
+        hints_revealed: revealedAnswer ? 3 : hintsRevealedCount,
+        correct,
+        user_id: USER_ID,
+      }),
+    });
+    sessionPpEarned += result.pp_earned;
+    el("headerPp").textContent = `${Math.round(result.total_pp)}pp`;
+  } catch (e) {
+    // pp tracking is secondary -- don't interrupt gameplay if this fails
+  }
+}
+
+// Logs a finished session for the profile screen's history/best-performance
+// list. Does NOT award any pp itself -- that already happened per-question
+// via recordQuestionPp above. ppEarnedThisSession is whatever this function's
+// caller already accumulated locally from those per-question responses.
+async function finalizeSession(drillId, tierCounts, comboForDrill, masteryAfter, ppEarnedThisSession) {
   const totalAttempts = tierCounts["300"] + tierCounts["100"] + tierCounts["50"] + tierCounts["miss"];
   if (totalAttempts === 0) return null;
   try {
-    const result = await api("/api/profile/record-session", {
+    const result = await api("/api/profile/session-ended", {
       method: "POST",
       body: JSON.stringify({
         drill_id: drillId,
         tier_counts: tierCounts,
         max_combo: comboForDrill,
+        pp_earned_this_session: ppEarnedThisSession || 0,
         mastery_after: masteryAfter ?? null,
         user_id: USER_ID,
       }),
     });
-    el("headerPp").textContent = `${Math.round(result.total_pp)}pp`;
     return result;
   } catch (e) {
-    return null;  // pp tracking is secondary -- don't block the results screen on it
+    return null;  // logging is secondary -- don't block the results screen on it
   }
 }
 
@@ -934,7 +1040,9 @@ function submitCurrentAnswer() {
   else submitPracticeAnswer();
 }
 el("submitBtn").addEventListener("click", submitCurrentAnswer);
-el("answerInput").addEventListener("keydown", (e) => { if (e.key === "Enter") submitCurrentAnswer(); });
+// Enter-to-submit for the math field is wired via MathQuill's own
+// `handlers.enter` config (see initAnswerMathField), not a keydown listener --
+// MathQuill's contenteditable internals don't reliably bubble the same way.
 
 // ---------------- WARM-UP MODE ----------------
 
@@ -942,12 +1050,18 @@ async function startWarmup(drillIds) {
   mode = "warmup";
   resetSessionStats();
   warmupPerDrill = {};
+  sessionPpEarned = 0;
   showScreen("game");
   currentAccent = "var(--pink)";
   el("hitBox").style.setProperty("--accent", currentAccent);
   el("hintBtn").style.setProperty("--accent", currentAccent);
   inlineWhiteboardView.sizeToDisplay();  // now visible -- fix up the backing store size
   setStatus("Starting warm-up...");
+
+  const drillsForThisWarmup = drillIds || cachedImplementedDrills.map(m => m.id);
+  for (const drillId of drillsForThisWarmup) {
+    recordSessionStart(drillId);  // each drill included counts as one "open," like starting a beatmap
+  }
 
   try {
     const data = await api("/api/sessions/warmup/start", {
@@ -967,9 +1081,9 @@ async function loadNextWarmupProblem() {
   el("feedbackText").textContent = "";
   el("hintBox").classList.add("hidden");
   el("hintBox").innerHTML = "";
-  el("answerInput").value = "";
+if (window.answerMathField) answerMathField.latex("");
   clearInlineCanvas();
-  el("answerInput").focus();
+if (window.answerMathField) answerMathField.focus();
   hintsRevealed = 0;
   usedHintThisProblem = false;
 
@@ -1025,14 +1139,16 @@ async function submitWarmupAnswer() {
   const fb = el("feedbackText");
   const drillId = currentProblem.drill_id;
   const drillStats = warmupPerDrill[drillId] || (warmupPerDrill[drillId] = {
-    tierCounts: { "300": 0, "100": 0, "50": 0, "miss": 0 }, combo: 0, maxCombo: 0, mastery: 0,
+    tierCounts: { "300": 0, "100": 0, "50": 0, "miss": 0 }, combo: 0, maxCombo: 0, mastery: 0, ppEarned: 0,
   });
 
+  let revealedAnswerThisQuestion = false;
   if (checkResult.correct) {
     const judgement = judgementForHints(hintsRevealed);
     if (judgement.revealedAnswer) {
       countMiss += 1;
       combo = 0;
+      revealedAnswerThisQuestion = true;
       drillStats.tierCounts.miss += 1;
       drillStats.combo = 0;
       fb.textContent = "Answer revealed -- combo broken.";
@@ -1060,6 +1176,24 @@ async function submitWarmupAnswer() {
   }
   drillStats.mastery = checkResult.new_mastery;
   updateHud();
+
+  try {
+    const ppResult = await api("/api/profile/record-question", {
+      method: "POST",
+      body: JSON.stringify({
+        drill_id: drillId,
+        hints_revealed: revealedAnswerThisQuestion ? 3 : hintsRevealed,
+        correct: checkResult.correct,
+        user_id: USER_ID,
+      }),
+    });
+    drillStats.ppEarned += ppResult.pp_earned;
+    sessionPpEarned += ppResult.pp_earned;
+    el("headerPp").textContent = `${Math.round(ppResult.total_pp)}pp`;
+  } catch (e) {
+    // pp tracking is secondary -- don't interrupt gameplay if this fails
+  }
+
   setTimeout(loadNextWarmupProblem, 700);
 }
 
@@ -1086,13 +1220,12 @@ async function finalizeWarmupSessions() {
   const entries = Object.entries(warmupPerDrill);
   let lastResult = null;
   for (const [drillId, stats] of entries) {
-    const result = await finalizeSession(drillId, stats.tierCounts, stats.maxCombo, stats.mastery);
+    const result = await finalizeSession(drillId, stats.tierCounts, stats.maxCombo, stats.mastery, stats.ppEarned);
     if (result) lastResult = result;
   }
-  if (lastResult) {
-    el("resultsPpNote").textContent =
-      `pp updated across ${entries.length} drill${entries.length === 1 ? "" : "s"} this session. Total: ${Math.round(lastResult.total_pp)}pp`;
-  }
+  el("resultsPpNote").textContent =
+    `+${Math.round(sessionPpEarned * 100) / 100}pp this session across ${entries.length} drill${entries.length === 1 ? "" : "s"}` +
+    (lastResult ? ` (total: ${Math.round(lastResult.total_pp)}pp)` : "");
 }
 
 // ---------------- END SESSION / RESULTS ----------------
@@ -1107,12 +1240,10 @@ el("endBtn").addEventListener("click", async () => {
     showResultsCommon();
     el("masteryBreakdown").innerHTML = "";
     const tierCounts = { "300": count300, "100": count100, "50": count50, "miss": countMiss };
-    const result = await finalizeSession(currentDrillId, tierCounts, maxCombo, lastKnownMastery);
-    if (result) {
-      const label = result.is_new_best ? "New best for this drill!" : "";
-      el("resultsPpNote").textContent =
-        `+${result.run_pp}pp this run${label ? " -- " + label : ""} (total: ${Math.round(result.total_pp)}pp)`;
-    }
+    const result = await finalizeSession(currentDrillId, tierCounts, maxCombo, lastKnownMastery, sessionPpEarned);
+    el("resultsPpNote").textContent =
+      `+${Math.round(sessionPpEarned * 100) / 100}pp this session` +
+      (result ? ` (total: ${Math.round(result.total_pp)}pp)` : "");
   }
 });
 
@@ -1314,7 +1445,7 @@ el("wbFullscreenBtn").addEventListener("click", () => {
   // active) into the overlay so you can submit without leaving fullscreen.
   el("whiteboardAnswerSlot").appendChild(el("answerAreaContainer"));
   fullscreenWhiteboardView.sizeToDisplay();
-  el("answerInput").focus();
+  if (window.answerMathField) answerMathField.focus();
 });
 
 el("wbExitBtn").addEventListener("click", () => {
@@ -1337,6 +1468,90 @@ async function refreshHeaderPp() {
   }
 }
 
+// ---- lightweight, dependency-free SVG chart builders ----
+
+function buildPpTrendSVG(ppHistory) {
+  const width = 900, height = 90;
+  if (!ppHistory || ppHistory.length < 2) {
+    const flatY = height - 10;
+    return `<svg viewBox="0 0 ${width} ${height}" class="pp-trend-svg" preserveAspectRatio="none">
+      <line x1="0" y1="${flatY}" x2="${width}" y2="${flatY}" stroke="var(--gold)" stroke-width="3" stroke-linecap="round"/>
+    </svg>`;
+  }
+  const values = ppHistory.map(p => p.total_pp);
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = (max - min) || 1;
+  const stepX = width / (values.length - 1);
+  const pad = 8;
+  const points = values.map((v, i) => {
+    const x = i * stepX;
+    const y = pad + (1 - (v - min) / range) * (height - pad * 2);
+    return `${x},${y}`;
+  }).join(" ");
+  return `<svg viewBox="0 0 ${width} ${height}" class="pp-trend-svg" preserveAspectRatio="none">
+    <polyline points="${points}" fill="none" stroke="var(--gold)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+function formatMonthLabel(key) {
+  const [y, m] = key.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+}
+
+function buildMonthlyChartSVG(playsByMonth) {
+  const width = 900, chartHeight = 200, labelSpace = 26;
+  const height = chartHeight + labelSpace;
+  const sortedKeys = Object.keys(playsByMonth).sort();
+  const data = sortedKeys.length
+    ? sortedKeys.map(k => ({ label: formatMonthLabel(k), value: playsByMonth[k] }))
+    : [{ label: "No plays yet", value: 0 }];
+
+  const max = Math.max(...data.map(d => d.value), 1);
+  const stepX = data.length > 1 ? width / (data.length - 1) : width / 2;
+  const usableHeight = chartHeight - 16;
+
+  let gridLines = "";
+  const gridSteps = 4;
+  const tickLabels = [];
+  for (let i = 0; i <= gridSteps; i++) {
+    const y = 8 + (i / gridSteps) * usableHeight;
+    gridLines += `<line x1="0" y1="${y}" x2="${width}" y2="${y}" stroke="#2c2940" stroke-width="1"/>`;
+    const value = Math.round(max * (1 - i / gridSteps));
+    tickLabels.push(`<text x="4" y="${y - 4}" fill="var(--text-dim)" font-size="10">${value}</text>`);
+  }
+
+  const points = data.map((d, i) => {
+    const x = data.length > 1 ? i * stepX : width / 2;
+    const y = 8 + (1 - d.value / max) * usableHeight;
+    return `${x},${y}`;
+  }).join(" ");
+
+  const xLabels = data.map((d, i) => {
+    const x = data.length > 1 ? i * stepX : width / 2;
+    // Thin out labels if there are many months, to avoid overlap.
+    if (data.length > 10 && i % Math.ceil(data.length / 10) !== 0) return "";
+    return `<text x="${x}" y="${chartHeight + 18}" fill="var(--text-dim)" font-size="11" text-anchor="middle">${d.label}</text>`;
+  }).join("");
+
+  return `<svg viewBox="0 0 ${width} ${height}" class="monthly-chart-svg" preserveAspectRatio="none">
+    ${gridLines}
+    ${tickLabels.join("")}
+    <polyline points="${points}" fill="none" stroke="var(--pink)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    ${xLabels}
+  </svg>`;
+}
+
+function timeAgo(isoDate) {
+  const diffMs = Date.now() - new Date(isoDate).getTime();
+  const hours = diffMs / (1000 * 60 * 60);
+  if (hours < 1) return "just now";
+  if (hours < 24) return `${Math.round(hours)}h ago`;
+  const days = hours / 24;
+  if (days < 7) return `${Math.round(days)}d ago`;
+  return new Date(isoDate).toLocaleDateString();
+}
+
 async function openProfileScreen() {
   showScreen("profile");
   setStatus("Loading profile...");
@@ -1346,6 +1561,7 @@ async function openProfileScreen() {
 
     el("profileTotalPp").textContent = Math.round(profile.total_pp);
     el("profilePlayCount").textContent = profile.play_count;
+    el("profileQuestionsAnswered").textContent = profile.questions_answered;
     el("profileAccuracy").textContent = `${profile.lifetime_accuracy}%`;
     el("profileMaxCombo").textContent = `${profile.max_combo_lifetime}x`;
     el("profileThisMonth").textContent = profile.questions_this_month;
@@ -1361,13 +1577,38 @@ async function openProfileScreen() {
     el("profileTier50").textContent = profile.tier_counts["50"];
     el("profileTierMiss").textContent = profile.tier_counts["miss"];
 
+    el("ppTrendChart").innerHTML = buildPpTrendSVG(profile.pp_history);
+    el("playHistoryChart").innerHTML = buildMonthlyChartSVG(profile.plays_by_month);
+
+    const bestList = el("profileBestList");
+    bestList.innerHTML = "";
+    const topSessions = [...profile.recent_sessions].sort((a, b) => b.pp_earned - a.pp_earned).slice(0, 5);
+    if (topSessions.length === 0) {
+      bestList.innerHTML = `<div class="profile-empty-note">No finished sessions yet -- play a drill and end the session to see your best runs here.</div>`;
+    }
+    topSessions.forEach((s, i) => {
+      const badgeColors = ["#ffd166", "#c0c0c0", "#cd7f32"];
+      const badgeColor = badgeColors[i] || "#4eeaff";
+      const row = document.createElement("div");
+      row.className = "profile-best-row";
+      row.innerHTML = `
+        <div class="rank-badge" style="background:${badgeColor}; color:#12111a;">${i + 1}</div>
+        <div class="info">
+          <div class="drill-name">${s.drill_id}</div>
+          <div class="meta">${s.accuracy_pct}% accuracy &middot; max combo ${s.max_combo}x &middot; ${timeAgo(s.date)}</div>
+        </div>
+        <div class="pp-value">+${s.pp_earned}pp</div>
+      `;
+      bestList.appendChild(row);
+    });
+
     const drillList = el("profileDrillList");
     drillList.innerHTML = "";
-    const drillIds = Object.keys(profile.per_drill_stats).sort(
-      (a, b) => DRILL_ORDER.indexOf(a) - DRILL_ORDER.indexOf(b)
-    );
+    const drillIds = Object.keys(profile.per_drill_stats)
+      .filter(id => profile.per_drill_stats[id].play_count > 0)
+      .sort((a, b) => profile.per_drill_stats[b].play_count - profile.per_drill_stats[a].play_count);
     if (drillIds.length === 0) {
-      drillList.innerHTML = `<div style="color: var(--text-dim); font-size: 13px;">No drills played yet -- go pick one!</div>`;
+      drillList.innerHTML = `<div class="profile-empty-note">No drills opened yet -- go pick one!</div>`;
     }
     for (const drillId of drillIds) {
       const stats = profile.per_drill_stats[drillId];
@@ -1392,7 +1633,172 @@ el("profileBackBtn").addEventListener("click", () => {
   loadMapGrid();
 });
 
+// ---------------- MATH INPUT (MathQuill) ----------------
+// Gives the answer box real math-typing behavior: "/" opens a fraction
+// with editable numerator/denominator, "sqrt"/"nthroot" auto-render as
+// root symbols, "^" opens an exponent slot, etc. -- the same idea as
+// Desmos/dailyintegral.org's input. MathQuill produces LaTeX internally;
+// latexToPlainExpr() below converts that into the plain expression
+// syntax (e.g. "sqrt(x)", "(a)/(b)", "x**2") the backend's sympy-based
+// checker (app/drills/expr_utils.py) already understands.
+
+let answerMathField = null;
+
+function initAnswerMathField() {
+  if (!window.MathQuill) {
+    console.warn("MathQuill failed to load (no internet access to the CDN?) -- falling back to a plain text input.");
+    const container = el("answerInput");
+    const fallbackInput = document.createElement("input");
+    fallbackInput.type = "text";
+    fallbackInput.id = "answerInputFallback";
+    fallbackInput.placeholder = "your answer";
+    fallbackInput.autocomplete = "off";
+    fallbackInput.style.cssText = "background:transparent;border:none;color:var(--text);font-size:20px;width:220px;text-align:center;font-family:'Space Grotesk',sans-serif;";
+    fallbackInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitCurrentAnswer(); });
+    container.appendChild(fallbackInput);
+    window.answerMathField = {
+      latex: (v) => { if (v !== undefined) fallbackInput.value = ""; return fallbackInput.value; },
+      focus: () => fallbackInput.focus(),
+    };
+    return;
+  }
+  const MQ = MathQuill.getInterface(2);
+  answerMathField = MQ.MathField(el("answerInput"), {
+    spaceBehavesLikeTab: true,
+    autoCommands: "sqrt nthroot pi theta sum prod",
+    autoOperatorNames: "sin cos tan csc sec cot log ln",
+    handlers: {
+      enter: () => submitCurrentAnswer(),
+    },
+  });
+  window.answerMathField = answerMathField;
+}
+
+function _extractBraceGroup(s, startIdx) {
+  let depth = 0;
+  for (let i = startIdx; i < s.length; i++) {
+    if (s[i] === "{") depth++;
+    else if (s[i] === "}") {
+      depth--;
+      if (depth === 0) return { content: s.slice(startIdx + 1, i), end: i + 1 };
+    }
+  }
+  return { content: s.slice(startIdx + 1), end: s.length };
+}
+function _extractBracketGroup(s, startIdx) {
+  let depth = 0;
+  for (let i = startIdx; i < s.length; i++) {
+    if (s[i] === "[") depth++;
+    else if (s[i] === "]") {
+      depth--;
+      if (depth === 0) return { content: s.slice(startIdx + 1, i), end: i + 1 };
+    }
+  }
+  return { content: s.slice(startIdx + 1), end: s.length };
+}
+
+// Recursive-descent-ish converter for the handful of LaTeX constructs
+// MathQuill will realistically produce for these drills: \frac, \sqrt
+// (with optional [n] index), \cdot/\times, \pi, trig/log names, ^{...}
+// exponents, and brace groups. Unknown commands are dropped rather than
+// left in as literal backslashes (which sympy can't parse).
+function latexToPlainExpr(latex) {
+  let s = latex.replace(/\\left/g, "").replace(/\\right/g, "");
+  const out = _convertLatexCommands(s);
+  return out.replace(/\s+/g, "");
+}
+
+function _convertLatexCommands(s) {
+  let result = "";
+  let i = 0;
+  const startsWith = (cmd) => s.startsWith(cmd, i);
+  while (i < s.length) {
+    if (startsWith("\\frac")) {
+      i += 5;
+      while (s[i] === " ") i++;
+      const num = _extractBraceGroup(s, i);
+      const numerator = _convertLatexCommands(num.content);
+      i = num.end;
+      while (s[i] === " ") i++;
+      const den = _extractBraceGroup(s, i);
+      const denominator = _convertLatexCommands(den.content);
+      i = den.end;
+      result += `((${numerator})/(${denominator}))`;
+    } else if (startsWith("\\sqrt")) {
+      i += 5;
+      while (s[i] === " ") i++;
+      if (s[i] === "[") {
+        const idx = _extractBracketGroup(s, i);
+        const index = _convertLatexCommands(idx.content);
+        i = idx.end;
+        while (s[i] === " ") i++;
+        const rad = _extractBraceGroup(s, i);
+        const radicand = _convertLatexCommands(rad.content);
+        i = rad.end;
+        result += `((${radicand})**(1/(${index})))`;
+      } else {
+        const rad = _extractBraceGroup(s, i);
+        const radicand = _convertLatexCommands(rad.content);
+        i = rad.end;
+        result += `sqrt(${radicand})`;
+      }
+    } else if (startsWith("\\nthroot")) {
+      // MathQuill doesn't natively expand "nthroot" -- but if a build ever
+      // does emit it (or a user's LaTeX contains it), handle it the same
+      // way as \sqrt[n]{}.
+      i += 8;
+      while (s[i] === " ") i++;
+      const idx = s[i] === "[" ? _extractBracketGroup(s, i) : { content: "2", end: i };
+      const index = _convertLatexCommands(idx.content);
+      i = idx.end;
+      while (s[i] === " ") i++;
+      const rad = _extractBraceGroup(s, i);
+      const radicand = _convertLatexCommands(rad.content);
+      i = rad.end;
+      result += `((${radicand})**(1/(${index})))`;
+    } else if (startsWith("\\cdot") || startsWith("\\times")) {
+      result += "*";
+      i += startsWith("\\cdot") ? 5 : 6;
+    } else if (startsWith("\\pi")) { result += "pi"; i += 3; }
+    else if (startsWith("\\ln")) { result += "log"; i += 3; }
+    else if (startsWith("\\log")) { result += "log"; i += 4; }
+    else if (startsWith("\\sin")) { result += "sin"; i += 4; }
+    else if (startsWith("\\cos")) { result += "cos"; i += 4; }
+    else if (startsWith("\\tan")) { result += "tan"; i += 4; }
+    else if (startsWith("\\csc")) { result += "csc"; i += 4; }
+    else if (startsWith("\\sec")) { result += "sec"; i += 4; }
+    else if (startsWith("\\cot")) { result += "cot"; i += 4; }
+    else if (s[i] === "^") {
+      i += 1;
+      while (s[i] === " ") i++;
+      if (s[i] === "{") {
+        const group = _extractBraceGroup(s, i);
+        result += `**(${_convertLatexCommands(group.content)})`;
+        i = group.end;
+      } else {
+        result += `**(${s[i]})`;
+        i += 1;
+      }
+    } else if (s[i] === "{") {
+      const group = _extractBraceGroup(s, i);
+      result += `(${_convertLatexCommands(group.content)})`;
+      i = group.end;
+    } else if (s[i] === "}") {
+      i += 1; // stray closing brace -- skip
+    } else if (s[i] === "\\") {
+      let j = i + 1;
+      while (j < s.length && /[a-zA-Z]/.test(s[j])) j++;
+      i = j; // unrecognized LaTeX command -- drop it rather than leave a stray backslash
+    } else {
+      result += s[i];
+      i += 1;
+    }
+  }
+  return result;
+}
+
 // ---------------- INIT ----------------
+initAnswerMathField();
 showScreen("select");
 loadMapGrid();
 refreshHeaderPp();

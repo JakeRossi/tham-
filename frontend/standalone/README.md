@@ -66,15 +66,19 @@ to run the 20-question calibration round across every drill.
   matrix's dimensions -- blank cells default to 0.
 - **Question count**: the HUD shows how many questions you've answered
   this session, alongside score/combo/accuracy.
-- **PP + player profile, following osu!'s actual mechanics**: pp is
-  awarded once per finished session on a drill (not per question) --
-  300/100/50/miss are accuracy judgements that feed into that one score,
-  the same way osu! computes a beatmap play's pp from aim/speed/accuracy.
-  Only your best-ever session per drill counts towards total pp, combined
-  with osu's real weightage decay (2nd-best score counts 95% as much, 3rd
-  90.25%, and so on) plus its documented bonus for breadth of drills
-  played. Click "View profile" in the header for lifetime pp, play count,
-  accuracy, max combo, questions this month, and a per-drill breakdown.
+- **PP + player profile, v3**: pp is awarded per question, hard-capped
+  per drill category (2pp for basic arithmetic up to 10pp for ODE/PDE),
+  and slow to level up (the first ~10 correct reps on a drill are worth
+  1pp each, the next ~20 worth 2pp each, and so on) -- deliberately slow,
+  the same way real pp is hard-won. Click "View profile" in the header
+  for a pp-over-time trend graph, a monthly play-history graph, a
+  best-performance list, and a most-played-drills list. **Play count**
+  (drill opens) and **questions answered** (individual questions
+  attempted) are tracked as two separate numbers, not conflated.
+- **LaTeX math input**: the answer box (MathQuill) supports typing `/`
+  for a fraction, `sqrt`/`nthroot` for a root, `^` for an exponent --
+  same idea as Desmos or dailyintegral.org. Requires internet access to
+  load from its CDN; falls back to a plain text box if that fails.
 - S/A/B/C/D rank at the end based on that weighted accuracy.
 
 ## Known limitations (intentional, for a fast first playable build)

@@ -1,108 +1,104 @@
 from app.engine import profile_store
 
 
-def test_new_profile_has_sane_defaults():
+def test_new_profile_defaults():
     profile_store.reset("prof_a")
     profile = profile_store.get_profile("prof_a")
     assert profile["total_pp"] == 0.0
     assert profile["play_count"] == 0
-    assert profile["max_combo_lifetime"] == 0
+    assert profile["questions_answered"] == 0
     assert profile_store.lifetime_accuracy(profile) == 100.0
-    assert profile_store.questions_this_month(profile) == 0
 
 
-def test_record_session_updates_expected_fields():
+def test_session_start_increments_play_count_not_questions_answered():
     profile_store.reset("prof_b")
-    profile, run_pp, is_new_best = profile_store.record_session(
-        "prof_b", "addition", tier_counts={"300": 8, "100": 2, "50": 0, "miss": 0}, max_combo=10,
-    )
-    assert run_pp > 0
-    assert is_new_best is True
-    assert profile["play_count"] == 10
-    assert profile["per_drill_stats"]["addition"]["play_count"] == 10
-    assert profile["per_drill_stats"]["addition"]["best_pp"] == run_pp
-    assert profile["total_pp"] > 0
-    assert profile_store.questions_this_month(profile) == 10
+    profile = profile_store.record_session_start("prof_b", "addition")
+    assert profile["play_count"] == 1
+    assert profile["questions_answered"] == 0  # opening a drill isn't answering a question
+    assert profile["per_drill_stats"]["addition"]["play_count"] == 1
+    assert profile_store.questions_this_month(profile) == 1  # play-count-based, not questions
 
 
-def test_empty_session_does_nothing():
+def test_record_question_increments_questions_answered_not_play_count():
     profile_store.reset("prof_c")
-    profile, run_pp, is_new_best = profile_store.record_session(
-        "prof_c", "addition", tier_counts={"300": 0, "100": 0, "50": 0, "miss": 0}, max_combo=0,
+    profile, pp_earned, tier, level = profile_store.record_question(
+        "prof_c", "addition", hints_revealed=0, correct=True,
     )
-    assert run_pp == 0.0
-    assert is_new_best is False
-    assert profile["play_count"] == 0
+    assert profile["questions_answered"] == 1
+    assert profile["play_count"] == 0  # answering a question isn't opening a drill
+    assert pp_earned == 1.0  # first correct rep, tier 300, level 1
+    assert tier == "300"
+    assert level == 1
 
 
-def test_only_best_session_per_drill_counts_towards_pp():
-    """Mirrors osu!: only your best score on a beatmap counts -- a worse
-    follow-up session shouldn't lower your recorded best."""
+def test_pp_accumulates_and_history_is_recorded():
     profile_store.reset("prof_d")
-    _, first_pp, _ = profile_store.record_session(
-        "prof_d", "addition", {"300": 10, "100": 0, "50": 0, "miss": 0}, max_combo=50,
-    )
-    profile, second_pp, is_new_best = profile_store.record_session(
-        "prof_d", "addition", {"300": 0, "100": 0, "50": 0, "miss": 10}, max_combo=0,
-    )
-    assert second_pp == 0.0  # all misses
-    assert is_new_best is False
-    assert profile["per_drill_stats"]["addition"]["best_pp"] == first_pp  # unchanged, not overwritten with 0
+    for _ in range(3):
+        profile, pp_earned, _, _ = profile_store.record_question("prof_d", "addition", 0, True)
+    assert profile["total_pp"] == 3.0
+    assert len(profile["pp_history"]) == 3
+    assert profile["pp_history"][-1]["total_pp"] == 3.0
 
 
-def test_better_session_does_replace_the_best():
+def test_miss_does_not_advance_correct_reps_or_earn_pp():
     profile_store.reset("prof_e")
-    _, first_pp, _ = profile_store.record_session(
-        "prof_e", "addition", {"300": 5, "100": 5, "50": 0, "miss": 0}, max_combo=5,
-    )
-    profile, second_pp, is_new_best = profile_store.record_session(
-        "prof_e", "addition", {"300": 20, "100": 0, "50": 0, "miss": 0}, max_combo=20,
-    )
-    assert second_pp > first_pp
-    assert is_new_best is True
-    assert profile["per_drill_stats"]["addition"]["best_pp"] == second_pp
+    profile, pp_earned, tier, _ = profile_store.record_question("prof_e", "addition", 0, False)
+    assert pp_earned == 0.0
+    assert tier == "miss"
+    assert profile["per_drill_stats"]["addition"]["correct_reps"] == 0
+    assert profile["questions_answered"] == 1  # still counts as an attempt though
 
 
-def test_total_pp_aggregates_across_multiple_drills_with_weightage():
+def test_pp_ramps_up_as_correct_reps_accumulate():
     profile_store.reset("prof_f")
-    profile_store.record_session("prof_f", "addition", {"300": 10, "100": 0, "50": 0, "miss": 0}, max_combo=50)
-    profile = profile_store.get_profile("prof_f")
-    pp_after_one_drill = profile["total_pp"]
-
-    profile_store.record_session("prof_f", "rref", {"300": 10, "100": 0, "50": 0, "miss": 0}, max_combo=50)
-    profile = profile_store.get_profile("prof_f")
-    pp_after_two_drills = profile["total_pp"]
-
-    assert pp_after_two_drills > pp_after_one_drill
+    pps = []
+    for _ in range(35):
+        _, pp_earned, _, _ = profile_store.record_question("prof_f", "addition", 0, True)
+        pps.append(pp_earned)
+    assert pps[0] == 1.0     # first rep, level 1
+    assert pps[15] == 2.0    # past the 10-rep threshold, level 2
+    assert pps[31] == 2.0    # arithmetic caps at 2 -- even past the 30-rep mark, stays capped
 
 
-def test_lifetime_accuracy_weighted_correctly():
+def test_session_end_logs_recent_session_without_touching_total_pp():
     profile_store.reset("prof_g")
-    profile_store.record_session("prof_g", "addition", {"300": 1, "100": 0, "50": 0, "miss": 1}, max_combo=1)
-    profile = profile_store.get_profile("prof_g")
-    # (300*1 + 0) / (300*2) = 0.5 -> 50%
-    assert profile_store.lifetime_accuracy(profile) == 50.0
-
-
-def test_profiles_persist_across_separate_get_calls():
-    profile_store.reset("prof_h")
-    profile_store.record_session("prof_h", "addition", {"300": 5, "100": 0, "50": 0, "miss": 0}, max_combo=5)
-    reloaded = profile_store.get_profile("prof_h")
-    assert reloaded["total_pp"] > 0
-    assert profile_store.PROFILES_PATH.exists()
-
-
-def test_different_users_are_independent():
-    profile_store.reset("prof_i1")
-    profile_store.reset("prof_i2")
-    profile_store.record_session("prof_i1", "addition", {"300": 5, "100": 0, "50": 0, "miss": 0}, max_combo=5)
-    profile_i2 = profile_store.get_profile("prof_i2")
-    assert profile_i2["total_pp"] == 0.0
-
-
-def test_mastery_after_tracked_per_drill():
-    profile_store.reset("prof_j")
-    profile, _, _ = profile_store.record_session(
-        "prof_j", "addition", {"300": 5, "100": 0, "50": 0, "miss": 0}, max_combo=5, mastery_after=0.6,
+    profile_store.record_question("prof_g", "addition", 0, True)  # total_pp becomes 1.0
+    profile = profile_store.record_session_end(
+        "prof_g", "addition", tier_counts={"300": 5, "100": 0, "50": 0, "miss": 0},
+        max_combo=5, pp_earned_this_session=5.0, mastery_after=0.4,
     )
-    assert profile["per_drill_stats"]["addition"]["best_mastery"] == 0.6
+    assert profile["total_pp"] == 1.0  # unaffected by session_end
+    assert len(profile["recent_sessions"]) == 1
+    assert profile["recent_sessions"][0]["pp_earned"] == 5.0
+    assert profile["recent_sessions"][0]["accuracy_pct"] == 100.0
+    assert profile["per_drill_stats"]["addition"]["best_mastery"] == 0.4
+
+
+def test_recent_sessions_most_recent_first():
+    profile_store.reset("prof_h")
+    profile_store.record_session_end("prof_h", "addition", {"300": 1, "100": 0, "50": 0, "miss": 0}, 1, 1.0)
+    profile = profile_store.record_session_end("prof_h", "subtraction", {"300": 1, "100": 0, "50": 0, "miss": 0}, 1, 2.0)
+    assert profile["recent_sessions"][0]["drill_id"] == "subtraction"
+    assert profile["recent_sessions"][1]["drill_id"] == "addition"
+
+
+def test_empty_session_end_does_nothing():
+    profile_store.reset("prof_i")
+    profile = profile_store.record_session_end("prof_i", "addition", {"300": 0, "100": 0, "50": 0, "miss": 0}, 0, 0.0)
+    assert profile["recent_sessions"] == []
+
+
+def test_different_users_independent():
+    profile_store.reset("prof_j1")
+    profile_store.reset("prof_j2")
+    profile_store.record_question("prof_j1", "addition", 0, True)
+    profile2 = profile_store.get_profile("prof_j2")
+    assert profile2["total_pp"] == 0.0
+
+
+def test_profile_persists_across_calls():
+    profile_store.reset("prof_k")
+    profile_store.record_question("prof_k", "addition", 0, True)
+    reloaded = profile_store.get_profile("prof_k")
+    assert reloaded["total_pp"] == 1.0
+    assert profile_store.PROFILES_PATH.exists()

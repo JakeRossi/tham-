@@ -1,95 +1,93 @@
 """
-PP (performance points), rebuilt to actually follow osu!'s documented
-mechanics (see the osu! wiki's "Performance points" article) rather than
-awarding pp per individual question, which is NOT how osu! works.
+PP (performance points) -- v3.
 
-How osu! actually does it, and the mapping used here:
+v1 awarded pp per question with an unbounded difficulty/combo/volume
+formula (too generous). v2 tried to mirror osu!'s actual best-score/
+weightage/bonus system, but applied to a drilling app that produces
+"sessions" rather than "beatmap plays," it awarded far too much pp per
+sitting (400-500pp for a single good run). This version goes back to
+awarding pp per QUESTION (simpler to reason about and tune), but with
+hard caps and a slow logarithmic leveling curve so it can't run away:
 
-  osu! concept                          math-osu equivalent
-  ------------------------------------------------------------------
-  One score on one beatmap              One finished session on one drill
-  Star rating (beatmap difficulty)      difficulty_weight(drill_id) --
-                                         position in the difficulty
-                                         progression (addition easy,
-                                         rref/ode-pde hard)
-  Aim/speed/strain (performance)         combo_factor(max_combo) -- a
-                                         (rough) stand-in for "how much
-                                         sustained difficulty you handled"
-  Accuracy (heavily, non-linearly        accuracy_fraction ** ACCURACY_EXPONENT
-  weighted -- osu notes an 80% FC        (osu's own docs give an example:
-  can be worth ~2/3 of a 95% score)      an 80% FC is worth about 2/3 of a
-                                         95% score -- ACCURACY_EXPONENT=2.5
-                                         reproduces that ratio: see
-                                         test_pp.py)
-  Only your BEST score per beatmap       best_pp per drill_id, only
-  counts towards total pp                replaced if a session beats it
-  Weightage: nth-best score counts       weighted_total_pp(): identical
-  for 0.95^(n-1) of its value            formula, applied across your
-                                         best score on each of the (up to
-                                         14) drills instead of thousands
-                                         of beatmaps
-  Bonus pp for breadth of maps played:   bonus_pp(): the exact documented
-  416.6667 * (1 - 0.995^min(N,1000))     formula, where N = number of
-                                         drills you have ANY best score on
-                                         (naturally capped at 14 here,
-                                         since that's all there is)
+  - Each drill CATEGORY has a hard ceiling on pp-per-question, ever:
+        arithmetic family (add/sub/mul/div/squares/sqrts/cubes/cbrts): 2pp
+        trig-values: 4pp   |  algebraic-manipulation: 3pp
+        derivatives: 5pp   |  integrals: 7pp
+        rref: 4pp          |  ode-pde: 10pp
+  - Within that ceiling, how much a single correct answer is worth
+    depends on how many correct reps you've ever done on that SPECIFIC
+    drill: the first ~10 reps are worth 1pp each, the next ~20 (up to 30
+    total) are worth 2pp each, the next ~30 (up to 60 total) are worth
+    3pp each, and so on -- each level requires MORE additional reps than
+    the last (a triangular-number threshold), until the drill's category
+    cap is reached. This is deliberately slow: reaching a hard drill's
+    10pp ceiling takes several hundred correct reps on that one drill.
+  - Hint tiers still matter: a "300" (no hints) earns the full amount for
+    your current level, "100" (1 hint) earns 60% of it, "50" (2 hints)
+    earns 30%, and a miss (wrong, or the answer fully revealed) earns 0 --
+    same accuracy-judgement idea as before, just applied as a multiplier
+    on a per-question award instead of feeding a per-session formula.
+  - total_pp is a plain running sum of every question's pp_earned. No
+    weightage decay, no best-score-per-drill, no bonus formula -- those
+    belonged to v2's per-session model and don't apply here.
 
-This is still an adaptation, not a byte-for-byte port -- osu!'s real
-aim/speed/strain values come from analyzing beatmap object placement,
-which has no equivalent in a drilling app. The accuracy/weightage/bonus
-mechanics, though, are taken directly from the documented formulas.
+This isn't a literal reproduction of osu!'s real formula (which computes
+pp from analyzed beatmap object placement) -- it's a simpler system tuned
+to the same *spirit*: pp should be hard-won, and grinding easy content
+should never be more efficient than tackling hard content well.
 """
 
 from __future__ import annotations
 
 import math
 
-BASE_PP = 50.0
-
-# Same order as the frontend's difficulty-ordered drill list -- earlier
-# entries are "easier" (lower star-rating equivalent), later ones "harder".
-DRILL_DIFFICULTY_ORDER = [
+# Hard per-question pp ceiling by drill. All 8 "basic arithmetic" drills
+# share one ceiling; everything else has its own.
+_ARITHMETIC_DRILLS = {
     "addition", "subtraction", "multiplication", "division",
     "squares", "sqrts", "cubes", "cbrts",
-    "trig-values", "algebraic-manipulation",
-    "derivatives", "integrals", "ode-pde", "rref",
-]
-DIFFICULTY_WEIGHT_STEP = 0.35  # 1.0 for the easiest drill, ~5.55 for the hardest
+}
 
-# Fit so that (0.80/0.95) ** ACCURACY_EXPONENT ≈ 0.66, matching osu!'s own
-# documented example that an 80% full-combo is worth roughly 2/3 of a 95%
-# accuracy score.
-ACCURACY_EXPONENT = 2.5
+QUESTION_PP_CAP = {
+    "trig-values": 4,
+    "algebraic-manipulation": 3,
+    "derivatives": 5,
+    "integrals": 7,
+    "rref": 4,
+    "ode-pde": 10,
+}
+DEFAULT_ARITHMETIC_CAP = 2
 
-# osu!'s weightage system: Total pp = p * 0.95^(n-1) for the nth-best score.
-WEIGHT_DECAY = 0.95
-
-# osu!'s documented bonus-pp formula for number of ranked maps scored on.
-BONUS_MAX = 416.6667
-BONUS_DECAY = 0.995
+# Judgement tier -> fraction of the current level's pp value earned.
+TIER_MULTIPLIER = {"300": 1.0, "100": 0.6, "50": 0.3, "miss": 0.0}
 
 
-def difficulty_weight(drill_id: str) -> float:
-    try:
-        index = DRILL_DIFFICULTY_ORDER.index(drill_id)
-    except ValueError:
-        index = len(DRILL_DIFFICULTY_ORDER) // 2  # unknown drill -- assume mid-difficulty
-    return 1.0 + index * DIFFICULTY_WEIGHT_STEP
+def question_pp_cap(drill_id: str) -> int:
+    if drill_id in _ARITHMETIC_DRILLS:
+        return DEFAULT_ARITHMETIC_CAP
+    return QUESTION_PP_CAP.get(drill_id, DEFAULT_ARITHMETIC_CAP)
 
 
-def combo_factor(max_combo: int) -> float:
-    """Rough stand-in for osu's aim/speed/strain contribution: sustaining a
-    longer combo reflects handling more of the drill's difficulty
-    consistently, with diminishing returns rather than unbounded scaling."""
-    return 1.0 + math.log10(1 + max(0, max_combo)) / 2
+def pp_level_for_reps(correct_reps: int) -> int:
+    """
+    Triangular-threshold leveling: level 1 for reps 0-9, level 2 for
+    10-29, level 3 for 30-59, level 4 for 60-99, ... -- level k starts at
+    cumulative rep count 5*k*(k-1) (a triangular number scaled by 10),
+    which is what produces the "1-10, 10-30, 30-60, ..." pattern.
+    Uncapped -- callers combine this with question_pp_cap().
+    """
+    if correct_reps < 10:
+        return 1
+    # Solve k(k-1)/2 <= reps/10 for the largest integer k, then level = k+1.
+    k = int((-1 + math.sqrt(1 + 8 * (correct_reps / 10))) / 2)
+    return k + 1
 
 
 def judgement_tier(hints_revealed: int, correct: bool) -> str:
     """
-    Classifies a single answered question into an osu-style accuracy
-    judgement. This is ONLY used to build up a session's tier_counts for
-    the accuracy calculation below -- it does NOT award pp by itself
-    (osu!'s 300/100/50 are accuracy judgements, not currency).
+    Classifies one answered question into an osu-style accuracy judgement.
+    hints_revealed >= 3 means the final hint (which states the answer
+    outright) was used -- graded like a miss even if technically correct.
     """
     if not correct:
         return "miss"
@@ -99,7 +97,7 @@ def judgement_tier(hints_revealed: int, correct: bool) -> str:
         return "100"
     if hints_revealed == 2:
         return "50"
-    return "miss"  # the 3rd hint IS the answer -- fully revealed
+    return "miss"
 
 
 def accuracy_fraction_from_tiers(tier_counts: dict[str, int]) -> float:
@@ -111,38 +109,22 @@ def accuracy_fraction_from_tiers(tier_counts: dict[str, int]) -> float:
     return weighted / (300 * total)
 
 
-def compute_run_pp(drill_id: str, accuracy_fraction: float, max_combo: int) -> float:
+def compute_question_pp(
+    drill_id: str,
+    hints_revealed: int,
+    correct: bool,
+    correct_reps_before_this_question: int,
+) -> tuple[float, str, int]:
     """
-    The raw pp value ONE finished session on ONE drill is worth --
-    analogous to what a single score on a single osu! beatmap is worth,
-    BEFORE the weightage system reduces it based on ranking among your
-    other best scores.
+    Returns (pp_earned, tier, level). A miss earns 0 pp and doesn't
+    advance the leveling curve (correct_reps only counts CORRECT answers,
+    tracked by the caller/profile store).
     """
-    accuracy_fraction = max(0.0, min(1.0, accuracy_fraction))
-    return round(
-        BASE_PP * difficulty_weight(drill_id) * (accuracy_fraction ** ACCURACY_EXPONENT) * combo_factor(max_combo),
-        2,
-    )
+    tier = judgement_tier(hints_revealed, correct)
+    if tier == "miss":
+        return 0.0, tier, pp_level_for_reps(correct_reps_before_this_question)
 
-
-def weighted_total_pp(best_pp_values: list[float]) -> float:
-    """osu!'s weightage system applied across your best score on each drill:
-    best score counts fully, 2nd-best counts for 95% of its value, 3rd-best
-    for 95%^2, and so on."""
-    sorted_desc = sorted(best_pp_values, reverse=True)
-    return round(sum(p * (WEIGHT_DECAY ** i) for i, p in enumerate(sorted_desc)), 2)
-
-
-def bonus_pp(num_drills_with_a_score: int) -> float:
-    """osu!'s documented bonus-pp formula, verbatim. N is naturally capped
-    at 14 here (the number of drills), so the bonus will always be modest
-    -- but it's the same formula, not a rescaled approximation."""
-    n = min(num_drills_with_a_score, 1000)
-    return round(BONUS_MAX * (1 - BONUS_DECAY ** n), 2)
-
-
-def total_pp_from_best_scores(per_drill_best_pp: dict[str, float]) -> float:
-    """Given each drill's best-ever run_pp, computes the profile's total pp:
-    weighted sum of best scores, plus the breadth-of-play bonus."""
-    best_values = [v for v in per_drill_best_pp.values() if v > 0]
-    return round(weighted_total_pp(best_values) + bonus_pp(len(best_values)), 2)
+    cap = question_pp_cap(drill_id)
+    level = min(pp_level_for_reps(correct_reps_before_this_question), cap)
+    pp_earned = round(level * TIER_MULTIPLIER[tier], 2)
+    return pp_earned, tier, level
