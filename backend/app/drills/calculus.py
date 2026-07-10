@@ -1,8 +1,12 @@
 """
-Calculus drills: derivatives (basic + partial), integrals (definite + line).
+Calculus drills: derivatives (single-variable through 2-variable partials,
+with real functional variety) and definite integrals.
 
-Only DerivativesDrill is fully implemented here as the reference pattern
-for anything sympy-backed. Integrals follows the same shape (see stub).
+Content generation is delegated to app/drills/function_library.py, which
+maps the continuous difficulty (already combo/accuracy-accelerated by
+engine/mastery.py) onto a discrete content level and builds an expression
+appropriate to that level -- see that module's docstring for the full
+level scheme.
 
 Key idea: because sympy can both GENERATE a random expression and
 symbolically CHECK whether a submitted answer is equivalent to the true
@@ -24,61 +28,52 @@ import sympy as sp
 
 from app.drills.base import CheckResult, Drill, Problem
 from app.drills.expr_utils import parse_user_expr, pretty_str
+from app.drills.function_library import (
+    MAX_LEVEL_SINGLE_VAR,
+    generate_single_var_expr,
+    generate_single_var_integrand,
+    generate_two_var_expr,
+    level_for_difficulty,
+    level_for_difficulty_derivative,
+)
 
 x, y = sp.symbols("x y")
 
 
-def _random_polynomial(rng: random.Random, max_degree: int, coeff_range: int = 9) -> sp.Expr:
-    """Build a random single-variable polynomial in x with degree <= max_degree."""
-    expr = sp.Integer(0)
-    for deg in range(max_degree, -1, -1):
-        coeff = rng.randint(-coeff_range, coeff_range)
-        if coeff != 0:
-            expr += coeff * x**deg
-    if expr == 0:
-        expr = sp.Integer(rng.randint(1, coeff_range))
-    return expr
-
-
-def _degree_for_difficulty(difficulty: float) -> int:
-    # 0.0 -> degree 1 (linear), 1.0 -> degree 4
-    return 1 + min(3, int(difficulty * 4))
-
-
 class DerivativesDrill(Drill):
     """
-    difficulty 0.0-0.5: single-variable polynomials, d/dx
-    difficulty 0.5-1.0: two-variable polynomials, partial derivative d/dx or d/dy
+    difficulty 0.0-0.5: single-variable, levels 1-10 (power rule through
+    combined product/quotient/chain rule -- see function_library.py).
+    difficulty 0.5-1.0: two-variable partials, levels 11-16.
     """
 
     id = "derivatives"
 
     def generate(self, difficulty: float, rng_seed: int | None = None) -> Problem:
         rng = random.Random(rng_seed)
-        max_degree = _degree_for_difficulty(difficulty)
+        level = level_for_difficulty_derivative(difficulty)
 
-        if difficulty < 0.5:
-            expr = _random_polynomial(rng, max_degree)
+        if level <= MAX_LEVEL_SINGLE_VAR:
+            expr = generate_single_var_expr(rng, level)
             derivative = sp.diff(expr, x)
-            prompt = f"$$\\frac{{d}}{{dx}}\\left[ {sp.latex(expr)} \\right]$$"
             var_name = "x"
+            prompt = f"$$\\frac{{d}}{{dx}}\\left[ {sp.latex(expr)} \\right]$$"
         else:
-            # two-variable expression, partial derivative w.r.t. a randomly chosen var
-            expr_x = _random_polynomial(rng, max_degree)
-            expr_y_part = rng.randint(-9, 9) * y ** rng.randint(1, max_degree)
-            expr = expr_x + expr_y_part
+            expr = generate_two_var_expr(rng, level)
             wrt = rng.choice([x, y])
             derivative = sp.diff(expr, wrt)
             var_name = str(wrt)
             prompt = f"$$\\frac{{\\partial}}{{\\partial {var_name}}}\\left[ {sp.latex(expr)} \\right]$$"
 
-        target = sp.expand(derivative)
+        target = sp.simplify(sp.expand(derivative))
         answer_str = pretty_str(target)
 
         hints = [
-            f"Differentiate term by term with respect to {var_name}.",
-            "Recall the power rule: d/dx[x^n] = n*x^(n-1). Constants and other-variable "
-            "terms not containing the variable you're differentiating w.r.t. drop to 0.",
+            f"Differentiate term by term with respect to {var_name}. If terms are multiplied "
+            "or divided, you'll need the product or quotient rule; if one function is nested "
+            "inside another, use the chain rule.",
+            "Recall: power rule d/dx[x^n]=n*x^(n-1), product rule (fg)'=f'g+fg', "
+            "quotient rule (f/g)'=(f'g-fg')/g^2, chain rule d/dx[f(g(x))]=f'(g(x))*g'(x).",
             f"The answer is $$ {sp.latex(target)} $$",
         ]
 
@@ -87,7 +82,7 @@ class DerivativesDrill(Drill):
             prompt=prompt,
             answer=answer_str,
             difficulty=difficulty,
-            seed={"expr": str(expr), "wrt": var_name},
+            seed={"expr": str(expr), "wrt": var_name, "level": level},
             hints=hints,
         )
 
@@ -115,20 +110,23 @@ class DerivativesDrill(Drill):
 
 class IntegralsDrill(Drill):
     """
-    Definite integrals of single-variable polynomials: integral of expr dx from a to b.
+    Definite integrals, levels 1-9 (power rule through a guaranteed-
+    integrable u-substitution pattern -- see function_library.py). Levels
+    are capped lower than derivatives' 10 because not every product/
+    quotient combination has an elementary antiderivative; generation
+    verifies integrability defensively (see generate_single_var_integrand).
 
-    NOTE: line integrals (integral over a parametrized curve of a vector
-    field) are NOT implemented here -- they need a meaningfully different
-    problem shape (a curve + a vector field, not just an expr + bounds).
-    Left as a future extension; see docs/DRILL_AUTHORING.md.
+    NOTE: line integrals and triple integrals are NOT implemented --
+    they need meaningfully different problem shapes. Left as a future
+    extension; see docs/DRILL_AUTHORING.md.
     """
 
     id = "integrals"
 
     def generate(self, difficulty: float, rng_seed: int | None = None) -> Problem:
         rng = random.Random(rng_seed)
-        max_degree = _degree_for_difficulty(difficulty)
-        expr = _random_polynomial(rng, max_degree)
+        level = level_for_difficulty(difficulty, max_level=9)
+        expr = generate_single_var_integrand(rng, level)
 
         # Keep bounds small and integer so the arithmetic stays clean-ish.
         bound_range = 2 + int(difficulty * 4)
@@ -146,7 +144,8 @@ class IntegralsDrill(Drill):
         antiderivative = sp.integrate(expr, x)
         prompt = f"$$\\int_{{{a}}}^{{{b}}} {sp.latex(expr)} \\, dx$$"
         hints = [
-            f"First find the antiderivative of the integrand with respect to x.",
+            "First find the antiderivative of the integrand with respect to x. Watch for "
+            "products (integration by parts) or a chain-rule pattern (u-substitution).",
             f"The antiderivative is $$ {sp.latex(antiderivative)} + C $$ "
             f"Evaluate it at x={b} and x={a}, then subtract.",
             f"The answer is $$ {sp.latex(target)} $$",
@@ -157,7 +156,7 @@ class IntegralsDrill(Drill):
             prompt=prompt,
             answer=answer_str,
             difficulty=difficulty,
-            seed={"expr": str(expr), "a": a, "b": b},
+            seed={"expr": str(expr), "a": a, "b": b, "level": level},
             hints=hints,
         )
 

@@ -28,6 +28,7 @@ from app.drills.base import Drill, Problem
 
 POOL_TARGET_SIZE = 50
 MAX_GENERATION_ATTEMPTS = POOL_TARGET_SIZE * 6  # give up looking for more uniques after this many tries
+CONSECUTIVE_MISS_LIMIT = 40  # give up sooner if we're clearly not finding anything new
 
 
 def difficulty_bucket(difficulty: float) -> float:
@@ -58,12 +59,25 @@ class ShuffleBag:
         seen_keys: set[str] = set()
         attempts = 0
         gen_seed = 0
+        consecutive_misses = 0
         while len(self.pool) < POOL_TARGET_SIZE and attempts < MAX_GENERATION_ATTEMPTS:
             problem = self.drill.generate(self.difficulty, rng_seed=gen_seed)
             key = _seed_key(problem.seed)
             if key not in seen_keys:
                 seen_keys.add(key)
                 self.pool.append(problem)
+                consecutive_misses = 0
+            else:
+                consecutive_misses += 1
+                # If we go this many draws in a row without finding a single
+                # NEW unique problem, the drill's parameter space at this
+                # difficulty is almost certainly smaller than POOL_TARGET_SIZE
+                # -- stop early rather than burning through the rest of
+                # MAX_GENERATION_ATTEMPTS for no benefit. This is what turns
+                # an under-parametrized level into "a smaller pool, built
+                # fast" instead of "a multi-second stall on every rebuild."
+                if consecutive_misses >= CONSECUTIVE_MISS_LIMIT:
+                    break
             gen_seed += 1
             attempts += 1
         # The pool may end up smaller than POOL_TARGET_SIZE if the drill's

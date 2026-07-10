@@ -19,9 +19,10 @@ def test_full_flow_session_start_questions_then_session_end():
 
     assert profile["questions_answered"] == 5
     assert profile["play_count"] == 1  # unchanged by answering questions
-    assert profile["total_pp"] == total_pp_earned_this_session
+    assert profile["total_pp"] == 0.0  # v4: total_pp doesn't move until the session ends
 
-    # Session ends -- logged for display, doesn't change total_pp.
+    # Session ends -- this play now competes for a top-200 spot, which
+    # sets total_pp (since it's the only play so far, it wins outright).
     profile = record_session_end(
         "flow_a", "derivatives", tier_counts, max_combo=5,
         pp_earned_this_session=total_pp_earned_this_session, mastery_after=0.3,

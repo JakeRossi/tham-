@@ -1,8 +1,9 @@
 """
 Player profile: persistent, file-backed (JSON) so it survives backend
-restarts. v3 schema -- see app/engine/pp.py's docstring for why pp
-accounting changed from a per-session/weightage model back to a
-per-question one.
+restarts. v4 -- total_pp is now the weighted sum of your best 200
+finished-session "plays" (see app/engine/pp.py's module docstring),
+not a running per-question sum. A mediocre play can never lower your
+total if your existing top plays are already better.
 
 Two DIFFERENT counters that are easy to conflate, kept deliberately
 separate per an explicit design requirement:
@@ -11,22 +12,20 @@ separate per an explicit design requirement:
                          "Play Count" is exactly this (once per beatmap
                          play attempt, not once per note hit).
   - questions_answered:  how many individual questions were attempted --
-                         a much larger, faster-growing number. This is
-                         what earlier versions of this file mistakenly
-                         called "play_count."
+                         a much larger, faster-growing number.
 
   osu! profile page shows          -> math-osu equivalent (this module)
   ---------------------------------------------------------------------
-  Performance points (pp)          -> total_pp (running sum, see pp.py)
+  Performance points (pp)          -> total_pp (top-200-weighted plays)
   Play count                       -> play_count (drill-open count)
   Rank/pp graph over time          -> pp_history (list of {date, total_pp})
   Monthly playcount graph          -> plays_by_month ("YYYY-MM" -> opens)
   Max combo                        -> max_combo_lifetime
   Join date                        -> joined_at
-  Best performance list            -> recent_sessions (logged at session
-                                       end -- for DISPLAY only; doesn't
-                                       affect total_pp, which already
-                                       accumulated per-question)
+  Your scores (one per beatmap)    -> all_plays (one entry per finished
+                                       session; top 200 count towards pp)
+  Best performance list            -> recent_sessions (for DISPLAY --
+                                       most-recent-first, not pp-sorted)
   Most played beatmaps             -> per_drill_stats sorted by play_count
 
 Storage: a single JSON file at backend/data/profiles.json (created lazily,
@@ -41,13 +40,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from app.engine.pp import compute_question_pp
+from app.engine.pp import compute_question_pp, total_pp_from_plays
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 PROFILES_PATH = DATA_DIR / "profiles.json"
 
 PP_HISTORY_LIMIT = 1000
 RECENT_SESSIONS_LIMIT = 50
+ALL_PLAYS_LIMIT = 5000  # far more than TOP_N_PLAYS=200 ever needs, just a sane cap on file growth
 
 _lock = threading.Lock()
 
@@ -74,6 +74,8 @@ def _default_profile(user_id: str) -> dict[str, Any]:
         "pp_history": [],         # [{"date": iso, "total_pp": float}, ...]
         "per_drill_stats": {},    # drill_id -> {play_count, questions_answered, correct_reps, best_mastery}
         "recent_sessions": [],    # [{drill_id, date, accuracy_pct, pp_earned, max_combo}, ...] most recent first
+        "all_plays": [],          # [{date, drill_id, pp}, ...] EVERY finished session's pp value ever --
+                                   # total_pp is recomputed from the top 200 of these (see pp.py)
     }
 
 
@@ -89,8 +91,13 @@ def _load_all() -> dict[str, dict[str, Any]]:
 
 def _save_all(all_profiles: dict[str, dict[str, Any]]) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    with open(PROFILES_PATH, "w") as f:
+    # Atomic write: write to a temp file then rename over the real one, so a
+    # concurrent read (or a process restart mid-write) can never see a
+    # half-written/corrupt JSON file.
+    tmp_path = PROFILES_PATH.with_suffix(".json.tmp")
+    with open(tmp_path, "w") as f:
         json.dump(all_profiles, f, indent=2)
+    tmp_path.replace(PROFILES_PATH)
 
 
 def _drill_stats(profile: dict[str, Any], drill_id: str) -> dict[str, Any]:
@@ -144,8 +151,11 @@ def record_question(
     user_id: str, drill_id: str, hints_revealed: int, correct: bool,
 ) -> tuple[dict[str, Any], float, str, int]:
     """
-    Awards pp for ONE answered question and updates all the lifetime
-    counters. Returns (profile, pp_earned, tier, level).
+    Computes pp for ONE answered question (for live in-session feedback
+    and to advance the leveling curve) and updates lifetime counters.
+    Does NOT touch total_pp -- see record_session_end, which is where a
+    session's accumulated pp actually gets counted (or not, if it isn't
+    among your best 200 plays). Returns (profile, pp_earned, tier, level).
     """
     with _lock:
         all_profiles = _load_all()
@@ -162,13 +172,7 @@ def record_question(
         stats["questions_answered"] += 1
         profile["questions_answered"] += 1
         profile["tier_counts"][tier] = profile["tier_counts"].get(tier, 0) + 1
-        profile["total_pp"] = round(profile["total_pp"] + pp_earned, 2)
         profile["last_played_at"] = _now_iso()
-
-        if pp_earned > 0:
-            profile["pp_history"].append({"date": _now_iso(), "total_pp": profile["total_pp"]})
-            if len(profile["pp_history"]) > PP_HISTORY_LIMIT:
-                profile["pp_history"] = profile["pp_history"][-PP_HISTORY_LIMIT:]
 
         all_profiles[user_id] = profile
         _save_all(all_profiles)
@@ -184,10 +188,11 @@ def record_session_end(
     mastery_after: float | None = None,
 ) -> dict[str, Any]:
     """
-    Logs a finished session for DISPLAY purposes (the profile screen's
-    "recent sessions" / best-performance-style list) and updates
-    best_mastery/max_combo_lifetime. Does NOT touch total_pp -- that's
-    already been accumulated question-by-question via record_question().
+    Finalizes a finished session: logs it for display (the "recent
+    sessions" / best-performance list), updates best_mastery/
+    max_combo_lifetime, AND records this session's pp as one "play" that
+    now competes for a spot in your best TOP_N_PLAYS -- this is where
+    total_pp actually gets (re)computed, not per-question.
     """
     total_attempts = sum(tier_counts.get(k, 0) for k in ("300", "100", "50", "miss"))
     with _lock:
@@ -216,6 +221,23 @@ def record_session_end(
             "max_combo": max_combo,
         })
         profile["recent_sessions"] = profile["recent_sessions"][:RECENT_SESSIONS_LIMIT]
+
+        # Record this play and recompute total_pp from the current best
+        # TOP_N_PLAYS -- a low-value play here literally cannot lower
+        # total_pp if better plays already exist, matching osu!'s "best
+        # plays define your pp" design.
+        if pp_earned_this_session > 0:
+            profile["all_plays"].append({
+                "date": _now_iso(), "drill_id": drill_id, "pp": round(pp_earned_this_session, 2),
+            })
+            profile["all_plays"] = profile["all_plays"][-ALL_PLAYS_LIMIT:]
+
+        new_total_pp = total_pp_from_plays([p["pp"] for p in profile["all_plays"]])
+        if new_total_pp != profile["total_pp"]:
+            profile["total_pp"] = new_total_pp
+            profile["pp_history"].append({"date": _now_iso(), "total_pp": new_total_pp})
+            if len(profile["pp_history"]) > PP_HISTORY_LIMIT:
+                profile["pp_history"] = profile["pp_history"][-PP_HISTORY_LIMIT:]
 
         all_profiles[user_id] = profile
         _save_all(all_profiles)

@@ -1,13 +1,16 @@
 """
-PP (performance points) -- v3.
+PP (performance points) -- v4.
 
-v1 awarded pp per question with an unbounded difficulty/combo/volume
-formula (too generous). v2 tried to mirror osu!'s actual best-score/
-weightage/bonus system, but applied to a drilling app that produces
-"sessions" rather than "beatmap plays," it awarded far too much pp per
-sitting (400-500pp for a single good run). This version goes back to
-awarding pp per QUESTION (simpler to reason about and tune), but with
-hard caps and a slow logarithmic leveling curve so it can't run away:
+v1 awarded pp per question with an unbounded formula (too generous). v2
+tried to mirror osu!'s best-score/weightage/bonus system applied per
+DRILL, but that awarded too much pp per sitting. v3 went to a pure
+per-question running sum with hard caps -- simple and well-behaved, but
+lost osu!'s real "only your best plays count" property (a mediocre play
+could never make your total pp go DOWN, but it could also never be
+"wasted" the way a real osu! score outside your top plays is). v4 keeps
+v3's per-question cap/leveling formula (still governs how much any single
+question can ever be worth) but changes how those add up into a lifetime
+total, to match osu!'s actual top-N-plays design:
 
   - Each drill CATEGORY has a hard ceiling on pp-per-question, ever:
         arithmetic family (add/sub/mul/div/squares/sqrts/cubes/cbrts): 2pp
@@ -20,21 +23,24 @@ hard caps and a slow logarithmic leveling curve so it can't run away:
     total) are worth 2pp each, the next ~30 (up to 60 total) are worth
     3pp each, and so on -- each level requires MORE additional reps than
     the last (a triangular-number threshold), until the drill's category
-    cap is reached. This is deliberately slow: reaching a hard drill's
-    10pp ceiling takes several hundred correct reps on that one drill.
+    cap is reached.
   - Hint tiers still matter: a "300" (no hints) earns the full amount for
     your current level, "100" (1 hint) earns 60% of it, "50" (2 hints)
-    earns 30%, and a miss (wrong, or the answer fully revealed) earns 0 --
-    same accuracy-judgement idea as before, just applied as a multiplier
-    on a per-question award instead of feeding a per-session formula.
-  - total_pp is a plain running sum of every question's pp_earned. No
-    weightage decay, no best-score-per-drill, no bonus formula -- those
-    belonged to v2's per-session model and don't apply here.
+    earns 30%, and a miss (wrong, or the answer fully revealed) earns 0.
+  - Each finished SESSION on a drill sums its questions' pp into one
+    "play" value -- analogous to one score on one osu! beatmap. Only your
+    best TOP_N_PLAYS=200 plays (across every drill, not deduplicated by
+    drill) count towards total_pp, combined with osu!'s real weightage
+    decay (0.95^(n-1) for the nth-best play). A new, worse play never
+    lowers your total if your existing top 200 are already better --
+    matching osu!'s actual "your best plays define your pp" design,
+    which a pure running sum (v3) didn't have.
 
 This isn't a literal reproduction of osu!'s real formula (which computes
 pp from analyzed beatmap object placement) -- it's a simpler system tuned
-to the same *spirit*: pp should be hard-won, and grinding easy content
-should never be more efficient than tackling hard content well.
+to the same *spirit*: pp should be hard-won, grinding easy content should
+never be more efficient than tackling hard content well, and your total
+should reflect your best performances, not just how much you've played.
 """
 
 from __future__ import annotations
@@ -128,3 +134,26 @@ def compute_question_pp(
     level = min(pp_level_for_reps(correct_reps_before_this_question), cap)
     pp_earned = round(level * TIER_MULTIPLIER[tier], 2)
     return pp_earned, tier, level
+
+
+# ---------------------------------------------------------------------------
+# Aggregation: total_pp is NOT a running sum of every question ever answered
+# (that would let raw volume dominate). Instead, each finished SESSION on a
+# drill produces one "play" value (the sum of that session's per-question
+# pp, each already capped/leveled by compute_question_pp above) -- directly
+# analogous to one score on one osu! beatmap. Only the best TOP_N_PLAYS of
+# those, combined with osu's real weightage decay (0.95^(n-1) for the nth-
+# best), count towards total_pp. A new, worse play doesn't reduce your
+# total if your existing top plays are already better -- matching osu!'s
+# actual "your best scores define your pp" design.
+# ---------------------------------------------------------------------------
+
+TOP_N_PLAYS = 200
+WEIGHT_DECAY = 0.95
+
+
+def total_pp_from_plays(play_pp_values: list[float]) -> float:
+    """Takes every recorded play's pp value, keeps only the best
+    TOP_N_PLAYS, and combines them with weightage decay."""
+    top_plays = sorted(play_pp_values, reverse=True)[:TOP_N_PLAYS]
+    return round(sum(p * (WEIGHT_DECAY ** i) for i, p in enumerate(top_plays)), 2)
