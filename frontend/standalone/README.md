@@ -10,7 +10,7 @@ what the eventual React app should do -- not the final UI.
 1. Start the backend (see the root `README.md`):
    ```bash
    cd backend
-   uvicorn app.main:app --reload
+   uvicorn app.main:app --reload --reload-dir app
    ```
 
 2. Serve this folder (don't just double-click `index.html` -- some

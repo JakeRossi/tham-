@@ -154,6 +154,28 @@
   }
   .checkbox-card .name { font-size: 14px; }
 
+  .mod-option-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+  .mod-radio-row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg-raised); border: 1px solid #2c2940; border-radius: 12px;
+    padding: 12px 16px; cursor: pointer; font-size: 14px;
+  }
+  .mod-radio-row input { width: 16px; height: 16px; accent-color: var(--pink); flex-shrink: 0; }
+  .mod-slider-row {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--bg-raised); border: 1px solid #2c2940; border-radius: 12px;
+    padding: 14px 18px; margin-bottom: 18px;
+  }
+  .mod-slider-row input[type="range"] { flex: 1; accent-color: var(--pink); }
+  .mod-slider-row span { font-size: 13px; color: var(--text-dim); white-space: nowrap; min-width: 70px; }
+  .digit-mod-btn {
+    background: var(--bg-raised); color: var(--text-dim); border: 1px solid #2c2940;
+    border-radius: 10px; padding: 10px 16px; font-size: 13px; cursor: pointer;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .digit-mod-btn.active { color: var(--text); border-color: var(--pink); background: rgba(255,93,162,0.12); }
+  #digitModGroup { flex-direction: row; flex-wrap: wrap; }
+
   .warmup-banner {
     background: linear-gradient(135deg, var(--pink) 0%, #a238ff 100%);
     border-radius: 18px;
@@ -394,7 +416,7 @@
 <body>
 <div class="app">
   <div class="header">
-    <div class="logo">math<span>-osu</span></div>
+    <div class="logo" id="logoHomeBtn" style="cursor: pointer;">math<span>-osu</span></div>
     <div class="header-right" id="headerRight">
       <button class="btn secondary profile-link" id="profileLinkBtn">
         <span id="headerPp">0pp</span> &middot; View profile
@@ -426,6 +448,38 @@
     <div class="bottom-actions" style="margin-top: 24px;">
       <button class="btn" id="startWarmupBtn">Start warm-up</button>
       <button class="btn secondary" id="cancelWarmupSetupBtn">Cancel</button>
+    </div>
+  </div>
+
+  <!-- DRILL OPTIONS (MODS) SCREEN -->
+  <div id="drillOptionsScreen" class="hidden">
+    <h2 id="drillOptionsTitle" style="margin-bottom: 6px;">Drill options</h2>
+    <p style="color: var(--text-dim); font-size: 14px; margin: 0 0 20px;">
+      Customize how this drill starts, or leave it adaptive to let mastery drive the difficulty.
+    </p>
+
+    <div class="section-label">Starting difficulty</div>
+    <div class="mod-option-group">
+      <label class="mod-radio-row">
+        <input type="radio" name="difficultyMode" value="adaptive" id="modeAdaptive" checked />
+        <span>Adaptive (recommended) -- starts easy, speeds up with your combo/accuracy</span>
+      </label>
+      <label class="mod-radio-row">
+        <input type="radio" name="difficultyMode" value="fixed" id="modeFixed" />
+        <span>Start at a specific level</span>
+      </label>
+    </div>
+    <div class="mod-slider-row hidden" id="levelSliderRow">
+      <input type="range" min="1" max="10" value="1" id="levelSlider" />
+      <span id="levelSliderValue">Level 1</span>
+    </div>
+
+    <div class="section-label hidden" id="digitModLabel">Digit count (arithmetic only)</div>
+    <div class="mod-option-group hidden" id="digitModGroup"></div>
+
+    <div class="bottom-actions" style="margin-top: 28px;">
+      <button class="btn" id="startDrillWithModsBtn">Start</button>
+      <button class="btn secondary" id="cancelDrillOptionsBtn">Cancel</button>
     </div>
   </div>
 
@@ -637,6 +691,7 @@ function renderMathOrText(container, text) {
 const screens = {
   select: el("selectScreen"),
   warmupSetup: el("warmupSetupScreen"),
+  drillOptions: el("drillOptionsScreen"),
   game: el("gameScreen"),
   results: el("resultsScreen"),
   profile: el("profileScreen"),
@@ -684,7 +739,7 @@ async function loadMapGrid() {
         <div class="name">${m.name}</div>
         <div class="mastery-bar"><div class="mastery-fill"></div></div>
       `;
-      card.addEventListener("click", () => startPractice(m.id, color));
+      card.addEventListener("click", () => openDrillOptions(m.id, m.name, color));
       grid.appendChild(card);
     }
     setStatus(implemented.length ? "" : "No implemented drills found -- check the backend is up to date.");
@@ -727,6 +782,84 @@ el("selectNoneBtn").addEventListener("click", () => {
   openWarmupSetup();
 });
 el("cancelWarmupSetupBtn").addEventListener("click", () => showScreen("select"));
+
+// ---------------- DRILL OPTIONS / MODS SCREEN ----------------
+
+const ARITHMETIC_DRILL_IDS = new Set([
+  "addition", "subtraction", "multiplication", "division", "squares", "sqrts", "cubes", "cbrts",
+]);
+// Midpoints of each digit-count's difficulty range, matching the backend's
+// _digits_for_difficulty(): 1-digit=[0,0.25), 2-digit=[0.25,0.5), 3-digit=[0.5,0.75), 4-digit=[0.75,1.0].
+const DIGIT_MOD_DIFFICULTY = { 1: 0.1, 2: 0.35, 3: 0.6, 4: 0.9 };
+
+let pendingDrillId = null;
+let pendingDrillAccent = null;
+let selectedDigitMod = null; // null = adaptive, else 1-4
+
+function openDrillOptions(drillId, drillName, accent) {
+  pendingDrillId = drillId;
+  pendingDrillAccent = accent;
+  selectedDigitMod = null;
+
+  el("drillOptionsTitle").textContent = `${drillName} -- options`;
+  el("modeAdaptive").checked = true;
+  el("levelSliderRow").classList.add("hidden");
+  el("levelSlider").value = 1;
+  el("levelSliderValue").textContent = "Level 1";
+
+  const isArithmetic = ARITHMETIC_DRILL_IDS.has(drillId);
+  el("digitModLabel").classList.toggle("hidden", !isArithmetic);
+  el("digitModGroup").classList.toggle("hidden", !isArithmetic);
+  if (isArithmetic) {
+    const group = el("digitModGroup");
+    group.innerHTML = "";
+    const options = [
+      { label: "Adaptive", value: null },
+      { label: "1 digit", value: 1 },
+      { label: "2 digit", value: 2 },
+      { label: "3 digit", value: 3 },
+      { label: "4 digit", value: 4 },
+    ];
+    for (const opt of options) {
+      const btn = document.createElement("button");
+      btn.className = "digit-mod-btn" + (opt.value === null ? " active" : "");
+      btn.textContent = opt.label;
+      btn.addEventListener("click", () => {
+        selectedDigitMod = opt.value;
+        group.querySelectorAll(".digit-mod-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+      });
+      group.appendChild(btn);
+    }
+  }
+
+  showScreen("drillOptions");
+}
+
+el("modeAdaptive").addEventListener("change", () => el("levelSliderRow").classList.add("hidden"));
+el("modeFixed").addEventListener("change", () => el("levelSliderRow").classList.remove("hidden"));
+el("levelSlider").addEventListener("input", (e) => {
+  el("levelSliderValue").textContent = `Level ${e.target.value}`;
+});
+
+el("cancelDrillOptionsBtn").addEventListener("click", () => showScreen("select"));
+
+el("startDrillWithModsBtn").addEventListener("click", () => {
+  let forcedDifficulty = null;
+
+  if (el("modeFixed").checked) {
+    const level = parseInt(el("levelSlider").value, 10);
+    forcedDifficulty = (level - 1) / 9; // level 1 -> 0.0, level 10 -> 1.0
+  }
+  // A digit-count mod is more specific than the general level slider --
+  // if both were somehow set, the digit mod wins since it's the more
+  // targeted choice for arithmetic drills.
+  if (selectedDigitMod !== null) {
+    forcedDifficulty = DIGIT_MOD_DIFFICULTY[selectedDigitMod];
+  }
+
+  startPractice(pendingDrillId, pendingDrillAccent, forcedDifficulty);
+});
 el("startWarmupBtn").addEventListener("click", () => {
   if (warmupSelectedIds.size === 0) {
     setStatus("Pick at least one drill for warm-up.");
@@ -856,10 +989,13 @@ el("matrixSubmitBtn").addEventListener("click", submitCurrentAnswer);
 // ---------------- PRACTICE MODE ----------------
 
 
-async function startPractice(drillId, accent) {
+let currentForcedDifficulty = null;  // set by the drill-options/mods screen; null = adaptive (mastery-driven)
+
+async function startPractice(drillId, accent, forcedDifficulty) {
   mode = "practice";
   currentDrillId = drillId;
   currentAccent = accent;
+  currentForcedDifficulty = forcedDifficulty ?? null;
   resetSessionStats();
   sessionPpEarned = 0;
   showScreen("game");
@@ -894,7 +1030,8 @@ if (window.answerMathField) answerMathField.focus();
   usedHintThisProblem = false;
 
   try {
-    const data = await api(`/api/problems/next/${currentDrillId}?user_id=${USER_ID}`);
+    const forcedParam = currentForcedDifficulty !== null ? `&forced_difficulty=${currentForcedDifficulty}` : "";
+    const data = await api(`/api/problems/next/${currentDrillId}?user_id=${USER_ID}${forcedParam}`);
     currentProblem = data;
     currentSettings = data;
     timeLimit = data.time_limit_seconds;
@@ -942,6 +1079,7 @@ async function submitPracticeAnswer() {
         answer: currentProblem.answer,
         submitted,
         used_hint: usedHintThisProblem,
+        combo,
         time_taken_seconds: timeTaken,
         time_limit_seconds: timeLimit,
         user_id: USER_ID,
@@ -1118,6 +1256,7 @@ async function submitWarmupAnswer() {
       answer: currentProblem.answer,
       submitted,
       used_hint: usedHintThisProblem,
+      combo: (warmupPerDrill[currentProblem.drill_id] && warmupPerDrill[currentProblem.drill_id].combo) || 0,
       time_taken_seconds: timeTaken,
       time_limit_seconds: timeLimit,
       user_id: USER_ID,
@@ -1267,7 +1406,7 @@ function showResultsCommon() {
 }
 
 el("playAgainBtn").addEventListener("click", () => {
-  if (mode === "practice") startPractice(currentDrillId, currentAccent);
+  if (mode === "practice") startPractice(currentDrillId, currentAccent, currentForcedDifficulty);
   else startWarmup(Array.from(warmupSelectedIds));
 });
 el("backToSelectBtn").addEventListener("click", () => {
@@ -1628,6 +1767,11 @@ async function openProfileScreen() {
 }
 
 el("profileLinkBtn").addEventListener("click", openProfileScreen);
+el("logoHomeBtn").addEventListener("click", () => {
+  clearTimers();
+  showScreen("select");
+  loadMapGrid();
+});
 el("profileBackBtn").addEventListener("click", () => {
   showScreen("select");
   loadMapGrid();

@@ -9,38 +9,37 @@ leaderboard ("map").
 ## Status
 
 Working today:
-- **All 14 drills implemented** with generation + answer-checking tests
-  (addition, subtraction, multiplication, division, squares, sqrts, cubes,
-  cbrts, trig values, algebraic manipulation, derivatives, integrals,
-  RREF, ODE basics). 75 backend tests passing.
-- **Mastery -> difficulty/hints algorithm is fully wired into the live
-  API** (`GET /api/problems/next/{drill_id}`): problem difficulty, time
-  limit, hint count, and hint delay all actually change based on how
-  well you're doing, not a fixed value.
-- **Shuffle-bag question scheduling**: each drill/difficulty tier won't
-  repeat a problem until every problem in its pool has been shown once
-  (see `backend/app/engine/scheduler.py`).
+- **All 14 drills implemented**, with **derivatives and integrals now
+  genuinely varied** (polynomials, trig, exponentials, product/quotient/
+  chain rule, up to 2-variable partials) instead of only polynomials --
+  see `backend/app/drills/function_library.py` for the 16-level content
+  progression. 98 backend tests passing.
+- **Mastery -> difficulty/hints algorithm, now combo/accuracy-
+  accelerated**: a long combo or high recent accuracy speeds up how fast
+  you climb through difficulty (either signal alone helps; a big combo
+  helps more than merely-high accuracy) -- see `backend/app/engine/mastery.py`.
+- **In-game mods**: click a drill to choose "adaptive" (default) or a
+  specific starting difficulty level (1-10); arithmetic drills also let
+  you lock in a specific digit count (1-4).
+- **Shuffle-bag question scheduling**, now with a defensive early-exit if
+  a drill/level's parameter space turns out smaller than expected -- this
+  is what was behind an earlier bug where partial-derivative questions
+  got stuck repeating. See `backend/app/engine/scheduler.py`.
 - **osu!-style hint scoring**: no hints = "300", one hint = "100", two
   hints = "50" (combo keeps climbing through all of these); revealing the
   final hint (which states the answer) breaks combo and counts as a miss.
-- **PP (performance points), v3**: awarded per QUESTION, not per session --
-  each drill category has a hard, permanent ceiling on pp-per-question
-  (2pp for basic arithmetic, up to 10pp for ODE/PDE), and how close you
-  get to that ceiling on any given question depends on how many CORRECT
-  reps you've ever done on that specific drill, via a slow logarithmic
-  leveling curve (first ~10 reps worth 1pp each, next ~20 worth 2pp each,
-  next ~30 worth 3pp each, and so on -- see `backend/app/engine/pp.py`).
-  Hint tiers still scale pp down (a "100" earns 60%, a "50" earns 30%, a
-  miss earns 0%). total_pp is a plain running sum -- no session weightage,
-  no best-score-per-drill, matching a much slower, more realistic
-  accumulation curve than the earlier two attempts at this system.
+- **PP (performance points)**: awarded per question with hard per-drill
+  caps and slow logarithmic leveling (see `backend/app/engine/pp.py`),
+  but total_pp is the weighted sum of your best 200 finished-session
+  "plays" across all drills (osu!'s real 0.95^n weightage) -- a worse
+  play literally cannot lower your total if better plays already exist.
 - **Player profile with real graphs**: a pp-over-time trend chart and a
   monthly play-history chart (both hand-rolled SVG, no charting library),
   plus a best-performance list and a most-played-drills list -- loosely
   modeled on an osu! profile page. Correctly distinguishes **play count**
   (how many times you've opened a drill -- osu!'s real "Play Count"
   metric) from **questions answered** (how many individual questions
-  you've attempted, a much larger number) -- these used to be conflated.
+  you've attempted, a much larger number).
 - **LaTeX-aware math input**: the answer box is a real math editor
   (MathQuill) -- type `/` for a fraction with editable numerator/
   denominator, `sqrt` or `nthroot` for a root symbol, `^` for an
@@ -56,15 +55,21 @@ Working today:
   drills are in scope before starting.
 - **A playable UI** at `frontend/standalone/index.html` -- no build step,
   osu!-styled, difficulty-ordered drill list, rectangular auto-sizing
-  prompt box, a whiteboard canvas (with fullscreen mode) for scratch work,
-  and a fill-in-the-blank matrix input for RREF. See
-  `frontend/standalone/README.md` to run it.
+  prompt box, a whiteboard canvas (with fullscreen mode, undo, color
+  picker) for scratch work, a fill-in-the-blank matrix input for RREF,
+  and a clickable logo to return home. See `frontend/standalone/README.md`
+  to run it.
+
+**Known bug fixed**: if you saw "Failed to fetch" errors with gameplay
+seemingly stuck on the same question, it was caused by `uvicorn --reload`
+watching (and restarting the server in reaction to changes in)
+`backend/data/profiles.json`, which gets rewritten on every answered
+question -- see the run instructions below for the fix (`--reload-dir app`).
 
 Not built yet: the polished React app in `frontend/src/` (the standalone
 HTML is a functional stand-in for now), a real database (profile storage
 is a single JSON file, fine for one local player), textbook
-upload/parsing, and real leaderboards (endpoint exists, but stores
-nothing durable yet).
+upload/parsing, real leaderboards, and 3+ variable calculus.
 
 ## Repo layout
 
@@ -80,7 +85,7 @@ See `docs/ARCHITECTURE.md` for the full picture.
 
 The fastest path to actually playing:
 ```bash
-cd backend && uvicorn app.main:app --reload &
+cd backend && uvicorn app.main:app --reload --reload-dir app &
 cd frontend/standalone && python3 -m http.server 5500
 ```
 Then open http://localhost:5500. See `frontend/standalone/README.md` for details.
@@ -93,8 +98,17 @@ python3 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 pytest                            # run the test suite
-uvicorn app.main:app --reload     # start the API at http://localhost:8000
+uvicorn app.main:app --reload --reload-dir app   # start the API at http://localhost:8000
 ```
+
+**Important: always include `--reload-dir app`.** Without it, uvicorn's
+`--reload` watches the entire `backend/` folder for changes -- including
+`backend/data/profiles.json`, which gets rewritten on every answered
+question. Uvicorn treats that write as "code changed" and restarts the
+whole server mid-session, which drops the connection and shows up as
+"Failed to fetch" errors with the game seemingly frozen on the last
+question you saw. `--reload-dir app` restricts the watcher to the actual
+source code.
 
 Check it's alive:
 
