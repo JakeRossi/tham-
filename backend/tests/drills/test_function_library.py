@@ -123,22 +123,52 @@ def test_every_integral_level_produces_a_correct_elementary_antiderivative():
                 assert marker not in s, f"level {level} seed {seed} produced non-elementary form: {antideriv}"
 
 
-def test_integral_levels_7_and_8_actually_use_integration_by_parts_patterns():
-    """Levels 7/8 should be polynomial*trig and polynomial*exp products,
-    not just fall back to plain polynomials every time."""
+def test_levels_4_and_6_use_integration_by_parts_patterns():
+    """Levels 4/6 should be polynomial*trig or polynomial*exp products
+    (integration by parts), not just fall back to plain polynomials."""
     import random
-    saw_trig_product = False
-    for seed in range(20):
+    for level in (4, 6):
+        saw_trig_or_exp_product = False
+        for seed in range(20):
+            rng = random.Random(seed)
+            integrand = generate_single_var_integrand(rng, level=level)
+            if integrand.has(sp.sin) or integrand.has(sp.cos) or integrand.has(sp.exp):
+                saw_trig_or_exp_product = True
+        assert saw_trig_or_exp_product, f"level {level} should use trig/exp products"
+
+
+def test_levels_3_and_5_use_u_substitution_patterns():
+    """Levels 3/5 should be chain-rule-reversal (u-sub) patterns --
+    inner_deriv * outer(inner), so the integrand should contain a
+    composed trig/exp call, not just a flat polynomial."""
+    import random
+    for level in (3, 5):
+        saw_composed_function = False
+        for seed in range(20):
+            rng = random.Random(seed)
+            integrand = generate_single_var_integrand(rng, level=level)
+            if integrand.has(sp.sin) or integrand.has(sp.cos) or integrand.has(sp.exp):
+                saw_composed_function = True
+        assert saw_composed_function, f"level {level} should use u-substitution patterns"
+
+
+def test_level_7_uses_cyclic_integration_by_parts():
+    """Level 7 should be exp(ax)*trig(bx) -- the classic cyclic IBP
+    pattern (integrate by parts twice, solve algebraically)."""
+    import random
+    for seed in range(10):
         rng = random.Random(seed)
         integrand = generate_single_var_integrand(rng, level=7)
-        if integrand.has(sp.sin) or integrand.has(sp.cos):
-            saw_trig_product = True
-    assert saw_trig_product
+        assert integrand.has(sp.exp)
+        assert integrand.has(sp.sin) or integrand.has(sp.cos)
 
-    saw_exp_product = False
-    for seed in range(20):
+
+def test_level_8_uses_partial_fractions():
+    """Level 8 should be a rational function with two distinct linear
+    factors in the denominator -- its antiderivative involves logs."""
+    import random
+    for seed in range(10):
         rng = random.Random(seed)
         integrand = generate_single_var_integrand(rng, level=8)
-        if integrand.has(sp.exp):
-            saw_exp_product = True
-    assert saw_exp_product
+        antideriv = sp.integrate(integrand, sp.Symbol("x"))
+        assert antideriv.has(sp.log)

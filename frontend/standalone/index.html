@@ -1387,6 +1387,7 @@ el("endBtn").addEventListener("click", async () => {
 });
 
 function showResultsCommon() {
+  resetAnswerAreaToHome();  // in case the session ended while fullscreen whiteboard was still open
   showScreen("results");
   el("resultsPpNote").textContent = "";
   const totalJudged = count300 + count100 + count50 + countMiss;
@@ -1587,13 +1588,22 @@ el("wbFullscreenBtn").addEventListener("click", () => {
   if (window.answerMathField) answerMathField.focus();
 });
 
-el("wbExitBtn").addEventListener("click", () => {
+el("wbExitBtn").addEventListener("click", resetAnswerAreaToHome);
+
+// Idempotent: safe to call even if the answer box is already home and the
+// overlay is already hidden (e.g. called defensively on every session end,
+// not just from the explicit "Exit fullscreen" button) -- without this,
+// ending a session while still in fullscreen whiteboard mode left the
+// answer box orphaned inside the hidden overlay, breaking the text/math
+// input for every subsequent drill until a page refresh.
+function resetAnswerAreaToHome() {
   el("whiteboardOverlay").classList.add("hidden");
-  // Move the answer box back to its normal spot in the game screen.
-  el("answerAreaAnchor").parentNode.insertBefore(
-    el("answerAreaContainer"), el("answerAreaAnchor").nextSibling
-  );
-});
+  const anchor = el("answerAreaAnchor");
+  const container = el("answerAreaContainer");
+  if (container.parentNode !== anchor.parentNode || container.previousElementSibling !== null) {
+    anchor.parentNode.insertBefore(container, anchor.nextSibling);
+  }
+}
 
 
 // ---------------- PROFILE SCREEN ----------------
