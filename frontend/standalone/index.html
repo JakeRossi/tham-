@@ -978,6 +978,14 @@ function getCurrentSubmittedAnswer() {
   if (currentProblem && currentProblem.drill_id === "rref") {
     return getMatrixAnswerString();
   }
+  if (window.usingMathQuillFallback && window.answerMathField) {
+    // Plain text already -- NOT LaTeX. The backend's parser (expr_utils.py)
+    // already understands '^' and implicit multiplication directly, so
+    // send it through as-is. Running plain text through latexToPlainExpr
+    // would mangle things like parenthesized exponents ("e^(2x)"), since
+    // that converter assumes LaTeX's brace-delimited "^{...}" form.
+    return answerMathField.latex().trim();
+  }
   if (window.answerMathField) {
     return latexToPlainExpr(answerMathField.latex()).trim();
   }
@@ -1801,6 +1809,7 @@ let answerMathField = null;
 function initAnswerMathField() {
   if (!window.MathQuill) {
     console.warn("MathQuill failed to load (no internet access to the CDN?) -- falling back to a plain text input.");
+    window.usingMathQuillFallback = true;
     const container = el("answerInput");
     const fallbackInput = document.createElement("input");
     fallbackInput.type = "text";
