@@ -1,0 +1,9 @@
+{
+  "id": "limits",
+  "name": "Limits",
+  "category": "calculus",
+  "description": "Limits drill.",
+  "difficulty_notes": "0.0 = direct substitution, 1.0 = combined Taylor-series-based limits with multiple vanishing terms on each side",
+  "implemented": true,
+  "prerequisites": ["algebraic-manipulation"]
+}

@@ -645,7 +645,7 @@ const CATEGORY_COLORS = {
 const DRILL_ORDER = [
   "addition", "subtraction", "multiplication", "division",
   "squares", "sqrts", "cubes", "cbrts",
-  "trig-values", "algebraic-manipulation",
+  "trig-values", "algebraic-manipulation", "limits",
   "derivatives", "integrals", "ode-pde", "rref",
 ];
 function byDifficultyOrder(a, b) {
@@ -1859,6 +1859,17 @@ function _extractBracketGroup(s, startIdx) {
   }
   return { content: s.slice(startIdx + 1), end: s.length };
 }
+function _extractParenGroup(s, startIdx) {
+  let depth = 0;
+  for (let i = startIdx; i < s.length; i++) {
+    if (s[i] === "(") depth++;
+    else if (s[i] === ")") {
+      depth--;
+      if (depth === 0) return { content: s.slice(startIdx + 1, i), end: i + 1 };
+    }
+  }
+  return { content: s.slice(startIdx + 1), end: s.length };
+}
 
 // Recursive-descent-ish converter for the handful of LaTeX constructs
 // MathQuill will realistically produce for these drills: \frac, \sqrt
@@ -1936,6 +1947,16 @@ function _convertLatexCommands(s) {
       while (s[i] === " ") i++;
       if (s[i] === "{") {
         const group = _extractBraceGroup(s, i);
+        result += `**(${_convertLatexCommands(group.content)})`;
+        i = group.end;
+      } else if (s[i] === "(") {
+        // Not LaTeX-standard, but defensively handle a parenthesized
+        // exponent like "e^(2x)" as a WHOLE group, not just the "("
+        // character -- otherwise only a single character after "^" gets
+        // treated as the exponent and the rest leaks out as separate
+        // multiplied terms, silently changing the meaning (e.g. turning
+        // "e^(2x)" into "e^2 * x" instead of "e^(2x)").
+        const group = _extractParenGroup(s, i);
         result += `**(${_convertLatexCommands(group.content)})`;
         i = group.end;
       } else {

@@ -57,6 +57,7 @@ _ARITHMETIC_DRILLS = {
 QUESTION_PP_CAP = {
     "trig-values": 4,
     "algebraic-manipulation": 3,
+    "limits": 4,
     "derivatives": 5,
     "integrals": 7,
     "rref": 4,
